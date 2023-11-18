@@ -1,0 +1,56 @@
+[package]
+authors = ["90degs2infty <90degs2infty@posteo.org>"]
+name = "microtile-app"
+edition = "2021"
+version = "0.1.0"
+
+[dependencies]
+cortex-m = { version = "0.7", features = ["critical-section-single-core"] }
+defmt = { version = "0.3", features = ["encoding-rzcobs"] }
+defmt-rtt = { version = "0.4" }
+panic-probe = { version = "0.3", features = ["print-defmt"] }
+rtic = { version = "2.0.1", features = [ "thumbv7-backend" ] }
+microbit-v2 = "0.13"
+# TODO add a monotonic if you use scheduling
+# rtic-monotonics = { version = "1.0.0", features = [ "cortex-m-systick" ]}
+
+# cargo build/run
+[profile.dev]
+codegen-units = 1
+debug = 2
+debug-assertions = true # <-
+incremental = false
+opt-level = "s" # <-
+overflow-checks = true # <-
+
+# cargo test
+[profile.test]
+codegen-units = 1
+debug = 2
+debug-assertions = true # <-
+incremental = false
+opt-level = "s" # <-
+overflow-checks = true # <-
+
+# cargo build/run --release
+[profile.release]
+codegen-units = 1
+debug = 2
+debug-assertions = false # <-
+incremental = false
+lto = 'fat'
+opt-level = "s" # <-
+overflow-checks = false # <-
+
+# cargo test --release
+[profile.bench]
+codegen-units = 1
+debug = 2
+debug-assertions = false # <-
+incremental = false
+lto = 'fat'
+opt-level = "s" # <-
+overflow-checks = false # <-
+
+[patch.crates-io]
+microbit-v2 = { git = "https://github.com/90degs2infty/microbit.git", branch = "feature_update-hal" }
