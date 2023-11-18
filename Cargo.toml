@@ -13,6 +13,7 @@ rtic = { version = "2.0.1", features = [ "thumbv7-backend" ] }
 microbit-v2 = "0.13"
 # TODO add a monotonic if you use scheduling
 # rtic-monotonics = { version = "1.0.0", features = [ "cortex-m-systick" ]}
+microtile-engine = { path = "../microtile-engine" }
 
 # cargo build/run
 [profile.dev]
