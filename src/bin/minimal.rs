@@ -19,6 +19,7 @@ mod app {
         pac::{NVIC, TIMER1 as HighLevelDisplayDriver},
         Board,
     };
+    use microtile_app::game;
 
     const HIGH_LEVEL_DISPLAY_FREQ: u32 = 10;
     const HIGH_LEVEL_DISPLAY_CYCLES: u32 =
@@ -39,6 +40,8 @@ mod app {
         defmt::info!("init");
 
         let board = Board::new(cx.device, cx.core);
+
+        let _game = game::initialize_dummy();
 
         // Configure timer to generate an IRQ at frequency HIGH_LEVEL_DISPLAY_FREQ
         let mut highlevel_display = Timer::periodic(board.TIMER1);
