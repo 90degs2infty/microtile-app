@@ -1,6 +1,8 @@
 #![no_main]
 #![no_std]
 #![feature(type_alias_impl_trait)]
+#![warn(clippy::pedantic)]
+#![allow(clippy::ignored_unit_patterns)] // macros from defmt trigger this lint, but are out of our control
 
 use microtile_app as _; // global logger + panicking-behavior + memory layout
 
