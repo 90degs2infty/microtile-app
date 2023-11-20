@@ -1,6 +1,9 @@
 use microbit::{
     gpio::{BTN_A, BTN_B},
-    hal::timer::{Instance, Periodic, Timer},
+    hal::{
+        prelude::_embedded_hal_timer_CountDown,
+        timer::{Instance, Periodic, Timer},
+    },
 };
 use microtile_engine::{
     gameplay::game::{Game, ProcessRows, TileFloating},
@@ -50,6 +53,9 @@ impl<T> GameDriver<T>
 where
     T: Instance,
 {
+    const GAME_TICK_FREQ: u32 = 2;
+    const GAME_TICK_CYCLES: u32 = Timer::<T, Periodic>::TICKS_PER_SECOND / Self::GAME_TICK_FREQ;
+
     pub fn new(
         _button_a: BTN_A,
         _button_b: BTN_B,
@@ -62,12 +68,16 @@ where
             .expect_left("the first tile should not end the game");
 
         // initialize the timer
-        todo!();
+        let mut game_tick = Timer::periodic(_timer);
+        game_tick.reset_event(); // out of caution
+        game_tick.enable_interrupt();
+        game_tick.start(Self::GAME_TICK_CYCLES);
+
         Self {
             _s: State::_TileFloating(game),
             _button_a,
             _button_b,
-            _timer: (),
+            _timer: game_tick,
         }
     }
 
