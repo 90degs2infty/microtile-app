@@ -57,9 +57,18 @@ where
         _mailbox: Receiver<'static, Message, MAILBOX_CAPACITY>,
     ) -> Self {
         // initialize the game
+        let game = Game::default()
+            .place_tile(BasicTile::Diagonal)
+            .expect_left("the first tile should not end the game");
 
         // initialize the timer
-        todo!()
+        todo!();
+        Self {
+            _s: State::_TileFloating(game),
+            _button_a,
+            _button_b,
+            _timer: (),
+        }
     }
 
     pub async fn run() -> Result<(), DriverError> {
