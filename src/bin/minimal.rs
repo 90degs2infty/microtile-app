@@ -11,20 +11,28 @@ use microtile_app as _; // global logger + panicking-behavior + memory layout
     dispatchers = [SWI0_EGU0]
 )]
 mod app {
+    use core::mem::MaybeUninit;
     use microbit::{
         display::nonblocking::{Display, Frame, MicrobitFrame},
         hal::{
             prelude::_embedded_hal_timer_CountDown,
             timer::{Instance, Periodic, Timer},
         },
-        pac::{NVIC, TIMER0 as LowLevelDisplayDriver, TIMER1 as HighLevelDisplayDriver},
+        pac::{
+            NVIC, TIMER0 as LowLevelDisplayDriver, TIMER1 as HighLevelDisplayDriver,
+            TIMER2 as TimerGameDriver,
+        },
         Board,
     };
-    use microtile_app::{device::display::GridRenderer, game};
+    use microtile_app::{
+        device::display::GridRenderer,
+        game::{self, GameDriver, Message, TimerHandler, MAILBOX_CAPACITY},
+    };
     use microtile_engine::gameplay::{
         game::{Game, TileFloating},
         raster::{Active, Passive, RasterizationExt},
     };
+    use rtic_sync::channel::{Channel, TrySendError};
 
     const HIGH_LEVEL_DISPLAY_FREQ: u32 = 5;
     const HIGH_LEVEL_DISPLAY_CYCLES: u32 =
@@ -42,13 +50,31 @@ mod app {
         highlevel_display_driver: Timer<HighLevelDisplayDriver, Periodic>,
         passive_frame: MicrobitFrame,
         merged_frame: MicrobitFrame,
+        game_driver: &'static mut GameDriver<'static, TimerGameDriver>,
+        game_driver_timer_handler: &'static mut TimerHandler<'static, TimerGameDriver, Periodic>,
     }
 
-    #[init]
+    #[init(local = [ timer_channel: Channel<Message, MAILBOX_CAPACITY> = Channel::new(), game_driver_mem: MaybeUninit<GameDriver<'static, TimerGameDriver>> = MaybeUninit::uninit(), game_driver_timer_handler_mem: MaybeUninit<TimerHandler<'static, TimerGameDriver, Periodic>> = MaybeUninit::uninit() ])]
     fn init(cx: init::Context) -> (Shared, Local) {
         defmt::info!("init");
 
         let board = Board::new(cx.device, cx.core);
+
+        cx.local.game_driver_mem.write(GameDriver::new(
+            board.buttons.button_a,
+            board.buttons.button_b,
+            board.TIMER2,
+            cx.local.timer_channel,
+        ));
+        let game_driver = unsafe { cx.local.game_driver_mem.assume_init_mut() };
+        let game_driver_timer_handler = game_driver
+            .get_timer_handler()
+            .expect("freshly initialized driver should still have handler available");
+        cx.local
+            .game_driver_timer_handler_mem
+            .write(game_driver_timer_handler);
+        let game_driver_timer_handler =
+            unsafe { cx.local.game_driver_timer_handler_mem.assume_init_mut() };
 
         let game = game::initialize_dummy();
         let passive_grid = <Game<TileFloating> as RasterizationExt<Passive>>::rasterize(&game);
@@ -78,6 +104,8 @@ mod app {
                 highlevel_display_driver: highlevel_display,
                 passive_frame,
                 merged_frame,
+                game_driver,
+                game_driver_timer_handler,
             },
         )
     }
@@ -124,5 +152,21 @@ mod app {
         cx.shared.display.lock(|display| {
             display.handle_display_event();
         });
+    }
+
+    #[task(priority = 1, local = [ game_driver ])]
+    async fn drive_game(cx: drive_game::Context) {
+        let _ = cx.local.game_driver.run();
+    }
+
+    #[task(binds = TIMER2, priority = 4, local = [ game_driver_timer_handler ])]
+    fn tick_game(cx: tick_game::Context) {
+        match cx.local.game_driver_timer_handler.handle_timer_event() {
+            Ok(()) => {}
+            Err(TrySendError::Full(_)) => {
+                defmt::debug!("dropping game tick to allow the engine to catch up")
+            }
+            Err(TrySendError::NoReceiver(_)) => unreachable!(),
+        };
     }
 }
