@@ -14,6 +14,7 @@ microbit-v2 = "0.13"
 # TODO add a monotonic if you use scheduling
 # rtic-monotonics = { version = "1.0.0", features = [ "cortex-m-systick" ]}
 microtile-engine = { path = "../microtile-engine" }
+tiny-led-matrix = "1.0.2"
 
 # cargo build/run
 [profile.dev]
