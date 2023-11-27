@@ -16,6 +16,7 @@ microbit-v2 = "0.13"
 microtile-engine = { path = "../microtile-engine" }
 tiny-led-matrix = "1.0.2"
 rtic-sync = "1.0.2"
+either = { version = "1.9.0", default_features = false }
 
 # cargo build/run
 [profile.dev]

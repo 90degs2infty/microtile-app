@@ -1,3 +1,5 @@
+use core::fmt::Debug;
+use either::Either;
 use microbit::{
     gpio::{BTN_A, BTN_B},
     hal::{
@@ -6,20 +8,10 @@ use microbit::{
     },
 };
 use microtile_engine::{
-    gameplay::game::{Game, ProcessRows, TileFloating},
+    gameplay::game::{Game, Observer, ProcessRows, TileFloating},
     geometry::tile::BasicTile,
 };
-use rtic_sync::channel::{Channel, Receiver, Sender, TrySendError};
-
-pub fn initialize_dummy() -> Game<TileFloating> {
-    Game::default()
-        .place_tile(BasicTile::Diagonal)
-        .expect_left("Game should not have ended by this first tile")
-        .descend_tile()
-        .expect_left("Tile should still be floating")
-        .descend_tile()
-        .expect_left("Tile should still be floating")
-}
+use rtic_sync::channel::{Channel, ReceiveError, Receiver, Sender, TrySendError};
 
 pub enum Message {
     TimerTick,
@@ -53,13 +45,25 @@ where
     }
 }
 
-enum State {
-    _ProcessRows(Game<ProcessRows>),
-    _TileFloating(Game<TileFloating>),
+enum State<O> {
+    _ProcessRows(Game<ProcessRows, O>),
+    _TileFloating(Game<TileFloating, O>),
+    /// Dummy value which is just there to apply [Jone's trick](https://matklad.github.io/2019/07/25/unsafe-as-a-type-system.html)
+    _Processing,
 }
 
-pub struct GameDriver<'a, T> {
-    _s: State,
+impl<O> State<O> {
+    fn apply<F>(&mut self, f: F)
+    where
+        F: FnOnce(Self) -> Self,
+    {
+        let stolen = core::mem::replace(self, Self::_Processing);
+        *self = f(stolen);
+    }
+}
+
+pub struct GameDriver<'a, T, O> {
+    _s: State<O>,
     _button_a: BTN_A,
     _button_b: BTN_B,
     _timer_sender: Sender<'a, Message, MAILBOX_CAPACITY>,
@@ -73,23 +77,29 @@ pub struct GameDriver<'a, T> {
 /// the capacity is defined as free constant.
 pub const MAILBOX_CAPACITY: usize = 4;
 
-impl<'a, T> GameDriver<'a, T>
+impl<'a, T, O> GameDriver<'a, T, O>
 where
     T: Instance,
+    O: Observer + Debug,
 {
-    const GAME_TICK_FREQ: u32 = 2;
+    const GAME_TICK_FREQ: u32 = 1; // TODO: make this 2 as soon as you implement softdrop
     const GAME_TICK_CYCLES: u32 = Timer::<T, Periodic>::TICKS_PER_SECOND / Self::GAME_TICK_FREQ;
 
+    /// Note: the contained peripherals start generating events right away, so be sure to
+    /// set up the event handling as fast as possible
     pub fn new(
         _button_a: BTN_A,
         _button_b: BTN_B,
         _timer: T,
         _timer_channel: &'a mut Channel<Message, MAILBOX_CAPACITY>,
+        _o: O,
     ) -> Self {
         // initialize the game
-        let game = Game::default()
+        let mut game = Game::default()
             .place_tile(BasicTile::Diagonal)
             .expect_left("the first tile should not end the game");
+        game.set_observer(_o)
+            .expect("newly initialized game should not have observer set");
 
         // initialize the timer
         let mut game_tick = Timer::periodic(_timer);
@@ -110,7 +120,49 @@ where
     }
 
     pub async fn run(&mut self) -> Result<(), DriverError> {
-        todo!()
+        loop {
+            let msg = self._timer_receiver.recv().await.map_err(|e| match e {
+                ReceiveError::Empty => unreachable!(""),
+                ReceiveError::NoSender => DriverError::SenderDropped,
+            })?;
+            defmt::debug!(
+                "consuming message, more messages pending: {}",
+                !self._timer_receiver.is_empty()
+            );
+
+            match msg {
+                Message::TimerTick => self._s.apply(|state| match state {
+                    State::_TileFloating(game) => match game.descend_tile() {
+                        Either::Left(game) => State::_TileFloating(game),
+                        Either::Right(game) => State::_ProcessRows(game),
+                    },
+                    State::_ProcessRows(game) => match game.process_row() {
+                        Either::Left(game) => State::_ProcessRows(game),
+                        Either::Right(game) => match game.place_tile(BasicTile::Diagonal) {
+                            Either::Left(game) => State::_TileFloating(game),
+                            Either::Right(mut game) => {
+                                defmt::info!("restarting game");
+                                let o = game
+                                    .clear_observer()
+                                    .expect("game should have an observer set");
+                                let mut game = Game::default();
+                                game.set_observer(o)
+                                    .expect("newly initialized game should not have observer set");
+                                let game = game
+                                    .place_tile(BasicTile::Diagonal)
+                                    .expect_left("first tile should not end game");
+                                State::_TileFloating(game)
+                            }
+                        },
+                    },
+                    State::_Processing => {
+                        unreachable!("_Processing should be an intermediate value")
+                    }
+                }),
+                Message::BtnAPress => todo!(),
+                Message::BtnBPress => todo!(),
+            }
+        }
     }
 
     pub fn get_timer_handler(&mut self) -> Option<TimerHandler<'a, T, Periodic>> {
@@ -120,9 +172,11 @@ where
     pub fn return_timer_handler(&mut self, handler: TimerHandler<'a, T, Periodic>) {
         if self._timer_handler.is_some() {
             unreachable!(
-                "There can be at most one object of type T over the programs entire lifetime"
+                "There can be at most one object of type TimerHandler over the programs entire lifetime"
             )
         }
         self._timer_handler = Some(handler);
     }
 }
+
+// https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=8ca99994a288cf4728778f0fa70f8d16

@@ -26,11 +26,7 @@ mod app {
     };
     use microtile_app::{
         device::display::GridRenderer,
-        game::{self, GameDriver, Message, TimerHandler, MAILBOX_CAPACITY},
-    };
-    use microtile_engine::gameplay::{
-        game::{Game, TileFloating},
-        raster::{Active, Passive, RasterizationExt},
+        game::{GameDriver, Message, TimerHandler, MAILBOX_CAPACITY},
     };
     use microtile_engine::{gameplay::game::Observer, geometry::grid::Grid};
     use rtic_sync::channel::{Channel, TrySendError};
@@ -65,7 +61,7 @@ mod app {
     #[local]
     struct Local {
         highlevel_display_driver: Timer<HighLevelDisplayDriver, Periodic>,
-        game_driver: &'static mut GameDriver<'static, TimerGameDriver>,
+        game_driver: &'static mut GameDriver<'static, TimerGameDriver, GameObserver>,
         game_driver_timer_handler: &'static mut TimerHandler<'static, TimerGameDriver, Periodic>,
     }
 
@@ -94,7 +90,7 @@ mod app {
         let game_driver_timer_handler =
             unsafe { cx.local.game_driver_timer_handler_mem.assume_init_mut() };
 
-        let game = game::initialize_dummy();
+        drive_game::spawn().ok();
 
         let passive_frame = MicrobitFrame::default();
         let merged_frame = MicrobitFrame::default();
@@ -166,7 +162,8 @@ mod app {
 
     #[task(priority = 1, local = [ game_driver ])]
     async fn drive_game(cx: drive_game::Context) {
-        let _ = cx.local.game_driver.run();
+        defmt::trace!("driving the game now");
+        let _ = cx.local.game_driver.run().await;
     }
 
     #[task(binds = TIMER2, priority = 4, local = [ game_driver_timer_handler ])]
