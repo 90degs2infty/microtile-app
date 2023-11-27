@@ -13,7 +13,7 @@ use microtile_app as _; // global logger + panicking-behavior + memory layout
 mod app {
     use core::mem::MaybeUninit;
     use microbit::{
-        display::nonblocking::{Display, Frame, MicrobitFrame},
+        display::nonblocking::{Display, MicrobitFrame},
         hal::{
             prelude::_embedded_hal_timer_CountDown,
             timer::{Instance, Periodic, Timer},
@@ -24,10 +24,7 @@ mod app {
         },
         Board,
     };
-    use microtile_app::{
-        device::display::GridRenderer,
-        game::{GameDriver, Message, TimerHandler, MAILBOX_CAPACITY},
-    };
+    use microtile_app::game::{GameDriver, Message, TimerHandler, MAILBOX_CAPACITY};
     use microtile_engine::{gameplay::game::Observer, geometry::grid::Grid};
     use rtic_sync::channel::{Channel, TrySendError};
 
@@ -36,42 +33,35 @@ mod app {
         Timer::<HighLevelDisplayDriver, Periodic>::TICKS_PER_SECOND / HIGH_LEVEL_DISPLAY_FREQ;
 
     #[derive(Debug)]
-    struct GameObserver;
+    struct NoopObserver;
 
-    impl Observer for GameObserver {
-        fn signal_board_changed(&self, active: Grid, passive: Grid) {
-            // When processing the topmost row, there are two signals comming in at short distance,
-            // because processing the last row triggers a signal and placing a new tile triggers a signal too
-            match update_frames::spawn(active, passive) {
-                Ok(()) => {}
-                Err(_) => defmt::debug!("dropping board update to allow for hardware to catch up"),
-            }
-        }
+    impl Observer for NoopObserver {
+        fn signal_board_changed(&self, _: Grid, _: Grid) {}
     }
 
     // Shared resources go here
     #[shared]
     struct Shared {
         display: Display<LowLevelDisplayDriver>,
-        merged_frame: MicrobitFrame,
-        passive_frame: MicrobitFrame,
     }
 
     // Local resources go here
     #[local]
     struct Local {
         highlevel_display_driver: Timer<HighLevelDisplayDriver, Periodic>,
-        game_driver: &'static mut GameDriver<'static, TimerGameDriver, GameObserver>,
+        game_driver: &'static mut GameDriver<'static, TimerGameDriver, NoopObserver>,
         game_driver_timer_handler: &'static mut TimerHandler<'static, TimerGameDriver, Periodic>,
+        merged_frame: MicrobitFrame,
+        passive_frame: MicrobitFrame,
     }
 
-    #[init(local = [ timer_channel: Channel<Message, MAILBOX_CAPACITY> = Channel::new(), game_driver_mem: MaybeUninit<GameDriver<'static, TimerGameDriver, GameObserver>> = MaybeUninit::uninit(), game_driver_timer_handler_mem: MaybeUninit<TimerHandler<'static, TimerGameDriver, Periodic>> = MaybeUninit::uninit() ])]
+    #[init(local = [ timer_channel: Channel<Message, MAILBOX_CAPACITY> = Channel::new(), game_driver_mem: MaybeUninit<GameDriver<'static, TimerGameDriver, NoopObserver>> = MaybeUninit::uninit(), game_driver_timer_handler_mem: MaybeUninit<TimerHandler<'static, TimerGameDriver, Periodic>> = MaybeUninit::uninit() ])]
     fn init(cx: init::Context) -> (Shared, Local) {
         defmt::info!("init");
 
         let board = Board::new(cx.device, cx.core);
 
-        let observer = GameObserver {};
+        let observer = NoopObserver {};
 
         cx.local.game_driver_mem.write(GameDriver::new(
             board.buttons.button_a,
@@ -107,13 +97,13 @@ mod app {
         (
             Shared {
                 display: Display::new(board.TIMER0, board.display_pins),
-                merged_frame,
-                passive_frame,
             },
             Local {
                 highlevel_display_driver: highlevel_display,
                 game_driver,
                 game_driver_timer_handler,
+                merged_frame,
+                passive_frame,
             },
         )
     }
@@ -141,14 +131,12 @@ mod app {
         };
     }
 
-    #[task(priority = 1, local = [ next_frame_passive: bool = false ], shared = [ display, passive_frame, merged_frame ])]
-    async fn display_toggle_frame(cx: display_toggle_frame::Context) {
+    #[task(priority = 1, local = [ next_frame_passive: bool = false , passive_frame, merged_frame ], shared = [ display ])]
+    async fn display_toggle_frame(mut cx: display_toggle_frame::Context) {
         if *cx.local.next_frame_passive {
-            (cx.shared.display, cx.shared.passive_frame)
-                .lock(|display, frame| display.show_frame(frame))
+            (cx.shared.display).lock(|display| display.show_frame(&cx.local.passive_frame))
         } else {
-            (cx.shared.display, cx.shared.merged_frame)
-                .lock(|display, frame| display.show_frame(frame))
+            (cx.shared.display).lock(|display| display.show_frame(&cx.local.merged_frame))
         }
         *cx.local.next_frame_passive = !*cx.local.next_frame_passive;
     }
@@ -175,15 +163,5 @@ mod app {
             }
             Err(TrySendError::NoReceiver(_)) => unreachable!(),
         };
-    }
-
-    #[task(priority = 1, shared = [ merged_frame, passive_frame ])]
-    async fn update_frames(cx: update_frames::Context, active: Grid, passive: Grid) {
-        defmt::trace!("entering frame update");
-        (cx.shared.merged_frame, cx.shared.passive_frame).lock(|merged_frame, passive_frame| {
-            passive_frame.set(&GridRenderer::new(&passive));
-            merged_frame.set(&GridRenderer::new(&active.union(passive)));
-        });
-        defmt::trace!("leaving frame update");
     }
 }
