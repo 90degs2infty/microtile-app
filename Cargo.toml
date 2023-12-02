@@ -13,7 +13,7 @@ rtic = { version = "2.0.1", features = [ "thumbv7-backend" ] }
 microbit-v2 = "0.13"
 # TODO add a monotonic if you use scheduling
 # rtic-monotonics = { version = "1.0.0", features = [ "cortex-m-systick" ]}
-microtile-engine = { path = "../microtile-engine" }
+microtile-engine = { git = "ssh://git@github.com/90degs2infty/microtile-engine.git", branch = "develop" }
 tiny-led-matrix = "1.0.2"
 rtic-sync = "1.0.2"
 either = { version = "1.9.0", default_features = false }
