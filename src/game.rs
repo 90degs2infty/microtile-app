@@ -48,22 +48,12 @@ where
 enum State<O> {
     _ProcessRows(Game<ProcessRows, O>),
     _TileFloating(Game<TileFloating, O>),
-    /// Dummy value which is just there to apply [Jone's trick](https://matklad.github.io/2019/07/25/unsafe-as-a-type-system.html)
-    _Processing,
-}
-
-impl<O> State<O> {
-    fn apply<F>(&mut self, f: F)
-    where
-        F: FnOnce(Self) -> Self,
-    {
-        let stolen = core::mem::replace(self, Self::_Processing);
-        *self = f(stolen);
-    }
 }
 
 pub struct GameDriver<'a, T, O> {
-    _s: State<O>,
+    // `None` value is used to implement [Jone's trick](https://matklad.github.io/2019/07/25/unsafe-as-a-type-system.html),
+    // any user-facing `None` is considered a bug. I.e. the user may assume to always interact with a `Some(...)`.
+    _s: Option<State<O>>,
     _button_a: BTN_A,
     _button_b: BTN_B,
     _timer_sender: Sender<'a, Message, MAILBOX_CAPACITY>,
@@ -110,7 +100,7 @@ where
         let (sender, receiver) = _timer_channel.split();
 
         Self {
-            _s: State::_TileFloating(game),
+            _s: Some(State::_TileFloating(game)),
             _button_a,
             _button_b,
             _timer_sender: sender.clone(),
@@ -131,34 +121,42 @@ where
             );
 
             match msg {
-                Message::TimerTick => self._s.apply(|state| match state {
-                    State::_TileFloating(game) => match game.descend_tile() {
-                        Either::Left(game) => State::_TileFloating(game),
-                        Either::Right(game) => State::_ProcessRows(game),
-                    },
-                    State::_ProcessRows(game) => match game.process_row() {
-                        Either::Left(game) => State::_ProcessRows(game),
-                        Either::Right(game) => match game.place_tile(BasicTile::Diagonal) {
-                            Either::Left(game) => State::_TileFloating(game),
-                            Either::Right(mut game) => {
-                                defmt::info!("restarting game");
-                                let o = game
-                                    .clear_observer()
-                                    .expect("game should have an observer set");
-                                let mut game = Game::default();
-                                game.set_observer(o)
-                                    .expect("newly initialized game should not have observer set");
-                                let game = game
-                                    .place_tile(BasicTile::Diagonal)
-                                    .expect_left("first tile should not end game");
-                                State::_TileFloating(game)
-                            }
-                        },
-                    },
-                    State::_Processing => {
-                        unreachable!("_Processing should be an intermediate value")
+                Message::TimerTick => {
+                    // We need to have the wrapped `Game` as owned value (as opposed to as borrowed value), because
+                    // `Game`'s API maps owned values to owned values.
+                    // But since `run`
+                    let state = self._s.take();
+                    if state.is_none() {
+                        unreachable!("GameDriver should always be in a defined state");
                     }
-                }),
+
+                    self._s = state.map(|state| match state {
+                        State::_TileFloating(game) => match game.descend_tile() {
+                            Either::Left(game) => State::_TileFloating(game),
+                            Either::Right(game) => State::_ProcessRows(game),
+                        },
+                        State::_ProcessRows(game) => match game.process_row() {
+                            Either::Left(game) => State::_ProcessRows(game),
+                            Either::Right(game) => match game.place_tile(BasicTile::Diagonal) {
+                                Either::Left(game) => State::_TileFloating(game),
+                                Either::Right(mut game) => {
+                                    defmt::info!("restarting game");
+                                    let o = game
+                                        .clear_observer()
+                                        .expect("game should have an observer set");
+                                    let mut game = Game::default();
+                                    game.set_observer(o).expect(
+                                        "newly initialized game should not have observer set",
+                                    );
+                                    let game = game
+                                        .place_tile(BasicTile::Diagonal)
+                                        .expect_left("first tile should not end game");
+                                    State::_TileFloating(game)
+                                }
+                            },
+                        },
+                    })
+                }
                 Message::BtnAPress => todo!(),
                 Message::BtnBPress => todo!(),
             }
