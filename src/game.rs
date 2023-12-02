@@ -8,7 +8,7 @@ use microbit::{
     },
 };
 use microtile_engine::{
-    gameplay::game::{Game, Observer, ProcessRows, TileFloating},
+    gameplay::game::{Game, Observer, ProcessRows, TileFloating, TileNeeded},
     geometry::tile::BasicTile,
 };
 use rtic_sync::channel::{Channel, ReceiveError, Receiver, Sender, TrySendError};
@@ -46,8 +46,9 @@ where
 }
 
 enum State<O> {
-    _ProcessRows(Game<ProcessRows, O>),
+    _TileNeeded(Game<TileNeeded, O>),
     _TileFloating(Game<TileFloating, O>),
+    _ProcessRows(Game<ProcessRows, O>),
 }
 
 pub struct GameDriver<'a, T, O> {
@@ -137,23 +138,23 @@ where
                         },
                         State::_ProcessRows(game) => match game.process_row() {
                             Either::Left(game) => State::_ProcessRows(game),
-                            Either::Right(game) => match game.place_tile(BasicTile::Diagonal) {
-                                Either::Left(game) => State::_TileFloating(game),
-                                Either::Right(mut game) => {
-                                    defmt::info!("restarting game");
-                                    let o = game
-                                        .clear_observer()
-                                        .expect("game should have an observer set");
-                                    let mut game = Game::default();
-                                    game.set_observer(o).expect(
-                                        "newly initialized game should not have observer set",
-                                    );
-                                    let game = game
-                                        .place_tile(BasicTile::Diagonal)
-                                        .expect_left("first tile should not end game");
-                                    State::_TileFloating(game)
-                                }
-                            },
+                            Either::Right(game) => State::_TileNeeded(game),
+                        },
+                        State::_TileNeeded(game) => match game.place_tile(BasicTile::Diagonal) {
+                            Either::Left(game) => State::_TileFloating(game),
+                            Either::Right(mut game) => {
+                                defmt::info!("restarting game");
+                                let o = game
+                                    .clear_observer()
+                                    .expect("game should have an observer set");
+                                let mut game = Game::default();
+                                game.set_observer(o)
+                                    .expect("newly initialized game should not have observer set");
+                                let game = game
+                                    .place_tile(BasicTile::Diagonal)
+                                    .expect_left("first tile should not end game");
+                                State::_TileFloating(game)
+                            }
                         },
                     })
                 }
