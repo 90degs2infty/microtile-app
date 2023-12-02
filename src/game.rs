@@ -8,7 +8,7 @@ use microbit::{
     },
 };
 use microtile_engine::{
-    gameplay::game::{Game, Observer, ProcessRows, TileFloating},
+    gameplay::game::{Game, Observer, ProcessRows, TileFloating, TileNeeded},
     geometry::tile::BasicTile,
 };
 use rtic_sync::channel::{Channel, ReceiveError, Receiver, Sender, TrySendError};
@@ -46,8 +46,43 @@ where
 }
 
 enum State<O> {
-    _ProcessRows(Game<ProcessRows, O>),
+    _TileNeeded(Game<TileNeeded, O>),
     _TileFloating(Game<TileFloating, O>),
+    _ProcessRows(Game<ProcessRows, O>),
+}
+
+impl<O> State<O>
+where
+    O: Observer + Debug,
+{
+    fn tick(self) -> Self {
+        match self {
+            State::_TileFloating(game) => match game.descend_tile() {
+                Either::Left(game) => State::_TileFloating(game),
+                Either::Right(game) => State::_ProcessRows(game),
+            },
+            State::_ProcessRows(game) => match game.process_row() {
+                Either::Left(game) => State::_ProcessRows(game),
+                Either::Right(game) => State::_TileNeeded(game),
+            },
+            State::_TileNeeded(game) => match game.place_tile(BasicTile::Diagonal) {
+                Either::Left(game) => State::_TileFloating(game),
+                Either::Right(mut game) => {
+                    defmt::info!("restarting game");
+                    let o = game
+                        .clear_observer()
+                        .expect("game should have an observer set");
+                    let mut game = Game::default();
+                    game.set_observer(o)
+                        .expect("newly initialized game should not have observer set");
+                    let game = game
+                        .place_tile(BasicTile::Diagonal)
+                        .expect_left("first tile should not end game");
+                    State::_TileFloating(game)
+                }
+            },
+        }
+    }
 }
 
 pub struct GameDriver<'a, T, O> {
@@ -130,32 +165,7 @@ where
                         unreachable!("GameDriver should always be in a defined state");
                     }
 
-                    self._s = state.map(|state| match state {
-                        State::_TileFloating(game) => match game.descend_tile() {
-                            Either::Left(game) => State::_TileFloating(game),
-                            Either::Right(game) => State::_ProcessRows(game),
-                        },
-                        State::_ProcessRows(game) => match game.process_row() {
-                            Either::Left(game) => State::_ProcessRows(game),
-                            Either::Right(game) => match game.place_tile(BasicTile::Diagonal) {
-                                Either::Left(game) => State::_TileFloating(game),
-                                Either::Right(mut game) => {
-                                    defmt::info!("restarting game");
-                                    let o = game
-                                        .clear_observer()
-                                        .expect("game should have an observer set");
-                                    let mut game = Game::default();
-                                    game.set_observer(o).expect(
-                                        "newly initialized game should not have observer set",
-                                    );
-                                    let game = game
-                                        .place_tile(BasicTile::Diagonal)
-                                        .expect_left("first tile should not end game");
-                                    State::_TileFloating(game)
-                                }
-                            },
-                        },
-                    })
+                    self._s = state.map(|state| state.tick())
                 }
                 Message::BtnAPress => todo!(),
                 Message::BtnBPress => todo!(),
