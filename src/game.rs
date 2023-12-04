@@ -118,5 +118,3 @@ where
         }
     }
 }
-
-// https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=8ca99994a288cf4728778f0fa70f8d16
