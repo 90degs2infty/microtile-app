@@ -14,9 +14,9 @@ pub struct Started;
 pub struct Stopped;
 
 pub struct RotationDriver<'a, 'b, S> {
-    _gpiote_channel: &'b GpioteChannel<'b>,
-    _button_event: GpioteChannelEvent<'b, Pin<Input<Floating>>>,
-    _command_pipe: Sender<'a, Message, MAILBOX_CAPACITY>,
+    gpiote_channel: &'b GpioteChannel<'b>,
+    button_event: GpioteChannelEvent<'b, Pin<Input<Floating>>>,
+    command_pipe: Sender<'a, Message, MAILBOX_CAPACITY>,
     s: PhantomData<S>,
 }
 
@@ -27,7 +27,6 @@ impl<'a, 'b> RotationDriver<'a, 'b, Stopped> {
         button: &'b Pin<Input<Floating>>,
         mailbox: Sender<'a, Message, MAILBOX_CAPACITY>,
     ) -> Self {
-        channel.clear();
         channel.reset_events();
 
         let event = channel.input_pin(button);
@@ -35,16 +34,22 @@ impl<'a, 'b> RotationDriver<'a, 'b, Stopped> {
         event.hi_to_lo();
 
         Self {
-            _gpiote_channel: channel,
-            _button_event: event,
-            _command_pipe: mailbox,
+            gpiote_channel: channel,
+            button_event: event,
+            command_pipe: mailbox,
             s: PhantomData,
         }
     }
 
     #[must_use]
     pub fn start(self) -> RotationDriver<'a, 'b, Started> {
-        todo!()
+        self.button_event.enable_interrupt();
+        RotationDriver {
+            gpiote_channel: self.gpiote_channel,
+            button_event: self.button_event,
+            command_pipe: self.command_pipe,
+            s: PhantomData,
+        }
     }
 
     #[must_use]
