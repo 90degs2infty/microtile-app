@@ -4,8 +4,9 @@ use tiny_led_matrix::{Render, MAX_BRIGHTNESS};
 pub struct GridRenderer<'a>(&'a Grid);
 
 impl<'a> GridRenderer<'a> {
+    #[must_use]
     pub fn new(grid: &'a Grid) -> Self {
-        Self { 0: grid }
+        Self(grid)
     }
 }
 
