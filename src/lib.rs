@@ -1,5 +1,6 @@
 #![no_main]
 #![no_std]
+#![warn(clippy::all, clippy::pedantic)]
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 use defmt_rtt as _; // global logger
