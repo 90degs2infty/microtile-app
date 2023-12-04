@@ -88,12 +88,12 @@ where
 pub struct GameDriver<'a, T, O> {
     // `None` value is used to implement [Jone's trick](https://matklad.github.io/2019/07/25/unsafe-as-a-type-system.html),
     // any user-facing `None` is considered a bug. I.e. the user may assume to always interact with a `Some(...)`.
-    _s: Option<State<O>>,
+    s: Option<State<O>>,
     _button_a: BTN_A,
     _button_b: BTN_B,
     _timer_sender: Sender<'a, Message, MAILBOX_CAPACITY>,
-    _timer_receiver: Receiver<'a, Message, MAILBOX_CAPACITY>,
-    _timer_handler: Option<TimerHandler<'a, T, Periodic>>,
+    timer_receiver: Receiver<'a, Message, MAILBOX_CAPACITY>,
+    timer_handler: Option<TimerHandler<'a, T, Periodic>>,
 }
 
 /// This mailbox capacity belongs to [`GameDriver`], but since [`GameDriver`] is
@@ -113,46 +113,46 @@ where
     /// Note: the contained peripherals start generating events right away, so be sure to
     /// set up the event handling as fast as possible
     pub fn new(
-        _button_a: BTN_A,
-        _button_b: BTN_B,
-        _timer: T,
-        _timer_channel: &'a mut Channel<Message, MAILBOX_CAPACITY>,
-        _o: O,
+        button_a: BTN_A,
+        button_b: BTN_B,
+        timer: T,
+        timer_channel: &'a mut Channel<Message, MAILBOX_CAPACITY>,
+        o: O,
     ) -> Self {
         // initialize the game
         let mut game = Game::default()
             .place_tile(BasicTile::Diagonal)
             .expect_left("the first tile should not end the game");
-        game.set_observer(_o)
+        game.set_observer(o)
             .expect("newly initialized game should not have observer set");
 
         // initialize the timer
-        let mut game_tick = Timer::periodic(_timer);
+        let mut game_tick = Timer::periodic(timer);
         game_tick.reset_event(); // out of caution
         game_tick.enable_interrupt();
         game_tick.start(Self::GAME_TICK_CYCLES);
 
-        let (sender, receiver) = _timer_channel.split();
+        let (sender, receiver) = timer_channel.split();
 
         Self {
-            _s: Some(State::_TileFloating(game)),
-            _button_a,
-            _button_b,
+            s: Some(State::_TileFloating(game)),
+            _button_a: button_a,
+            _button_b: button_b,
             _timer_sender: sender.clone(),
-            _timer_receiver: receiver,
-            _timer_handler: Some(TimerHandler::new(sender.clone(), game_tick)),
+            timer_receiver: receiver,
+            timer_handler: Some(TimerHandler::new(sender.clone(), game_tick)),
         }
     }
 
     pub async fn run(&mut self) -> Result<(), DriverError> {
         loop {
-            let msg = self._timer_receiver.recv().await.map_err(|e| match e {
+            let msg = self.timer_receiver.recv().await.map_err(|e| match e {
                 ReceiveError::Empty => unreachable!(""),
                 ReceiveError::NoSender => DriverError::SenderDropped,
             })?;
             defmt::debug!(
                 "consuming message, more messages pending: {}",
-                !self._timer_receiver.is_empty()
+                !self.timer_receiver.is_empty()
             );
 
             match msg {
@@ -160,12 +160,12 @@ where
                     // We need to have the wrapped `Game` as owned value (as opposed to as borrowed value), because
                     // `Game`'s API maps owned values to owned values.
                     // But since `run`
-                    let state = self._s.take();
+                    let state = self.s.take();
                     if state.is_none() {
                         unreachable!("GameDriver should always be in a defined state");
                     }
 
-                    self._s = state.map(|state| state.tick())
+                    self.s = state.map(State::tick);
                 }
                 Message::BtnAPress => todo!(),
                 Message::BtnBPress => todo!(),
@@ -174,16 +174,16 @@ where
     }
 
     pub fn get_timer_handler(&mut self) -> Option<TimerHandler<'a, T, Periodic>> {
-        self._timer_handler.take()
+        self.timer_handler.take()
     }
 
     pub fn return_timer_handler(&mut self, handler: TimerHandler<'a, T, Periodic>) {
-        if self._timer_handler.is_some() {
+        if self.timer_handler.is_some() {
             unreachable!(
                 "There can be at most one object of type TimerHandler over the programs entire lifetime"
             )
         }
-        self._timer_handler = Some(handler);
+        self.timer_handler = Some(handler);
     }
 }
 
