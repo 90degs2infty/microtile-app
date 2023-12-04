@@ -8,7 +8,6 @@ use rtic_sync::channel::{ReceiveError, Receiver};
 
 pub enum Message {
     TimerTick,
-    BtnAPress,
     BtnBPress,
 }
 
@@ -124,7 +123,6 @@ where
 
                     self.s = state.map(State::tick);
                 }
-                Message::BtnAPress => todo!(),
                 Message::BtnBPress => {
                     let state = self.s.take();
                     if state.is_none() {
