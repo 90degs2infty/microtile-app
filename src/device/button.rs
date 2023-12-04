@@ -19,12 +19,14 @@ pub struct GpioResources<'b> {
 }
 
 impl<'b> GpioResources<'b> {
+    #[must_use]
     pub fn new(channel: GpioteChannel<'b>, button: BTN_B) -> Self {
         let button = button.degrade();
         Self { channel, button }
     }
 
     // Due to a limitation in the HAL, it is not possible to regain access to BTN_B
+    #[must_use]
     pub fn free(self) -> Pin<Input<Floating>> {
         self.button
     }

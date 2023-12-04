@@ -20,7 +20,7 @@ mod app {
             timer::{Instance, Periodic, Timer},
         },
         pac::{
-            GPIOTE, NVIC, TIMER0 as LowLevelDisplayDriver, TIMER1 as HighLevelDisplayDriver,
+            NVIC, TIMER0 as LowLevelDisplayDriver, TIMER1 as HighLevelDisplayDriver,
             TIMER2 as TimerGameDriver,
         },
         Board,
