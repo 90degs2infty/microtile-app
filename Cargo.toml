@@ -3,6 +3,7 @@ authors = ["90degs2infty <90degs2infty@posteo.org>"]
 name = "microtile-app"
 edition = "2021"
 version = "0.1.0"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 cortex-m = { version = "0.7", features = ["critical-section-single-core"] }
