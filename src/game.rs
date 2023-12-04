@@ -1,6 +1,5 @@
 use core::fmt::Debug;
 use either::Either;
-use microbit::gpio::{BTN_A, BTN_B};
 use microtile_engine::{
     gameplay::game::{Game, Observer, ProcessRows, TileFloating, TileNeeded},
     geometry::tile::BasicTile,
@@ -61,8 +60,6 @@ pub struct GameDriver<'a, O> {
     // `None` value is used to implement [Jone's trick](https://matklad.github.io/2019/07/25/unsafe-as-a-type-system.html),
     // any user-facing `None` is considered a bug. I.e. the user may assume to always interact with a `Some(...)`.
     s: Option<State<O>>,
-    _button_a: BTN_A,
-    _button_b: BTN_B,
     mailbox: Receiver<'a, Message, MAILBOX_CAPACITY>,
 }
 
@@ -78,12 +75,7 @@ where
 {
     /// Note: the contained peripherals start generating events right away, so be sure to
     /// set up the event handling as fast as possible
-    pub fn new(
-        button_a: BTN_A,
-        button_b: BTN_B,
-        mailbox: Receiver<'a, Message, MAILBOX_CAPACITY>,
-        o: O,
-    ) -> Self {
+    pub fn new(mailbox: Receiver<'a, Message, MAILBOX_CAPACITY>, o: O) -> Self {
         // initialize the game
         let mut game = Game::default()
             .place_tile(BasicTile::Diagonal)
@@ -93,8 +85,6 @@ where
 
         Self {
             s: Some(State::_TileFloating(game)),
-            _button_a: button_a,
-            _button_b: button_b,
             mailbox,
         }
     }

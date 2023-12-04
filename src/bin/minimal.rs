@@ -75,12 +75,9 @@ mod app {
 
         let (sender, receiver) = cx.local.game_driver_channel.split();
 
-        cx.local.game_driver_mem.write(GameDriver::new(
-            board.buttons.button_a,
-            board.buttons.button_b,
-            receiver,
-            observer,
-        ));
+        cx.local
+            .game_driver_mem
+            .write(GameDriver::new(receiver, observer));
         let game_driver = unsafe { cx.local.game_driver_mem.assume_init_mut() };
 
         cx.local
