@@ -64,6 +64,7 @@ impl<'a, 'b> RotationDriver<'a, 'b, Started> {
     }
 
     pub fn handle_button_event(&mut self) -> Result<(), TrySendError<Message>> {
-        todo!()
+        self.gpiote_channel.reset_events();
+        self.command_pipe.try_send(Message::BtnBPress)
     }
 }
