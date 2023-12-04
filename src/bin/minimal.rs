@@ -83,9 +83,9 @@ mod app {
             .write(GameDriver::new(receiver, observer));
         let game_driver = unsafe { cx.local.game_driver_mem.assume_init_mut() };
 
-        cx.local
-            .timer_handler_mem
-            .write(GameTickDriver::new(sender.clone(), board.TIMER2).start());
+        cx.local.timer_handler_mem.write(
+            GameTickDriver::new(sender.clone(), board.buttons.button_a, board.TIMER2).start(),
+        );
         let timer_handler = unsafe { cx.local.timer_handler_mem.assume_init_mut() };
 
         drive_game::spawn().ok();
