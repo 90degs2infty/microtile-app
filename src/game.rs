@@ -17,9 +17,9 @@ pub enum DriverError {
 }
 
 enum State<O> {
-    _TileNeeded(Game<TileNeeded, O>),
-    _TileFloating(Game<TileFloating, O>),
-    _ProcessRows(Game<ProcessRows, O>),
+    TileNeeded(Game<TileNeeded, O>),
+    TileFloating(Game<TileFloating, O>),
+    ProcessRows(Game<ProcessRows, O>),
 }
 
 impl<O> State<O>
@@ -28,16 +28,16 @@ where
 {
     fn tick(self) -> Self {
         match self {
-            State::_TileFloating(game) => match game.descend_tile() {
-                Either::Left(game) => State::_TileFloating(game),
-                Either::Right(game) => State::_ProcessRows(game),
+            State::TileFloating(game) => match game.descend_tile() {
+                Either::Left(game) => State::TileFloating(game),
+                Either::Right(game) => State::ProcessRows(game),
             },
-            State::_ProcessRows(game) => match game.process_row() {
-                Either::Left(game) => State::_ProcessRows(game),
-                Either::Right(game) => State::_TileNeeded(game),
+            State::ProcessRows(game) => match game.process_row() {
+                Either::Left(game) => State::ProcessRows(game),
+                Either::Right(game) => State::TileNeeded(game),
             },
-            State::_TileNeeded(game) => match game.place_tile(BasicTile::Diagonal) {
-                Either::Left(game) => State::_TileFloating(game),
+            State::TileNeeded(game) => match game.place_tile(BasicTile::Diagonal) {
+                Either::Left(game) => State::TileFloating(game),
                 Either::Right(mut game) => {
                     defmt::info!("restarting game");
                     let o = game
@@ -49,7 +49,7 @@ where
                     let game = game
                         .place_tile(BasicTile::Diagonal)
                         .expect_left("first tile should not end game");
-                    State::_TileFloating(game)
+                    State::TileFloating(game)
                 }
             },
         }
@@ -84,7 +84,7 @@ where
             .expect("newly initialized game should not have observer set");
 
         Self {
-            s: Some(State::_TileFloating(game)),
+            s: Some(State::TileFloating(game)),
             mailbox,
         }
     }
