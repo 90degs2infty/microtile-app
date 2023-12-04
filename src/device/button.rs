@@ -1,11 +1,8 @@
 use crate::game::{Message, MAILBOX_CAPACITY};
 use core::marker::PhantomData;
-use microbit::{
-    gpio::BTN_B,
-    hal::{
-        gpio::{Floating, Input, Pin},
-        gpiote::{GpioteChannel, GpioteChannelEvent},
-    },
+use microbit::hal::{
+    gpio::{Floating, Input, Pin},
+    gpiote::{GpioteChannel, GpioteChannelEvent},
 };
 use rtic_sync::channel::{Sender, TrySendError};
 
@@ -50,11 +47,6 @@ impl<'a, 'b> RotationDriver<'a, 'b, Stopped> {
             command_pipe: self.command_pipe,
             s: PhantomData,
         }
-    }
-
-    #[must_use]
-    pub fn free(self) -> BTN_B {
-        todo!()
     }
 }
 
