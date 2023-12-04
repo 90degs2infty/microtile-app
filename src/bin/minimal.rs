@@ -25,7 +25,10 @@ mod app {
         Board,
     };
     use microtile_app::{
-        device::{display::GridRenderer, timer::GameTickDriver},
+        device::{
+            display::GridRenderer,
+            timer::{GameTickDriver, Started},
+        },
         game::{GameDriver, Message, MAILBOX_CAPACITY},
     };
     use microtile_engine::{gameplay::game::Observer, geometry::grid::Grid};
@@ -62,10 +65,10 @@ mod app {
     struct Local {
         highlevel_display_driver: Timer<HighLevelDisplayDriver, Periodic>,
         game_driver: &'static mut GameDriver<'static, GameObserver>,
-        timer_handler: &'static mut GameTickDriver<'static, TimerGameDriver>,
+        timer_handler: &'static mut GameTickDriver<'static, TimerGameDriver, Started>,
     }
 
-    #[init(local = [ game_driver_channel: Channel<Message, MAILBOX_CAPACITY> = Channel::new(), game_driver_mem: MaybeUninit<GameDriver<'static, GameObserver>> = MaybeUninit::uninit(), timer_handler_mem: MaybeUninit<GameTickDriver<'static, TimerGameDriver>> = MaybeUninit::uninit() ])]
+    #[init(local = [ game_driver_channel: Channel<Message, MAILBOX_CAPACITY> = Channel::new(), game_driver_mem: MaybeUninit<GameDriver<'static, GameObserver>> = MaybeUninit::uninit(), timer_handler_mem: MaybeUninit<GameTickDriver<'static, TimerGameDriver, Started>> = MaybeUninit::uninit() ])]
     fn init(cx: init::Context) -> (Shared, Local) {
         defmt::info!("init");
 
@@ -82,7 +85,7 @@ mod app {
 
         cx.local
             .timer_handler_mem
-            .write(GameTickDriver::new(sender.clone(), board.TIMER2));
+            .write(GameTickDriver::new(sender.clone(), board.TIMER2).start());
         let timer_handler = unsafe { cx.local.timer_handler_mem.assume_init_mut() };
 
         drive_game::spawn().ok();
