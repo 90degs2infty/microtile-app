@@ -1,17 +1,11 @@
 use core::fmt::Debug;
 use either::Either;
-use microbit::{
-    gpio::{BTN_A, BTN_B},
-    hal::{
-        prelude::_embedded_hal_timer_CountDown,
-        timer::{Instance, Periodic, Timer},
-    },
-};
+use microbit::gpio::{BTN_A, BTN_B};
 use microtile_engine::{
     gameplay::game::{Game, Observer, ProcessRows, TileFloating, TileNeeded},
     geometry::tile::BasicTile,
 };
-use rtic_sync::channel::{Channel, ReceiveError, Receiver, Sender, TrySendError};
+use rtic_sync::channel::{ReceiveError, Receiver};
 
 pub enum Message {
     TimerTick,
@@ -21,28 +15,6 @@ pub enum Message {
 
 pub enum DriverError {
     SenderDropped,
-}
-
-// TODO: I don't like the fact that I'm handing out the timer at this point,
-// this makes shutting down the timer kind of hard - also starting the timer in
-// the run function is not possible
-pub struct TimerHandler<'a, T, U> {
-    mailbox: Sender<'a, Message, MAILBOX_CAPACITY>,
-    timer: Timer<T, U>,
-}
-
-impl<'a, T, U> TimerHandler<'a, T, U>
-where
-    T: Instance,
-{
-    fn new(mailbox: Sender<'a, Message, MAILBOX_CAPACITY>, timer: Timer<T, U>) -> Self {
-        Self { mailbox, timer }
-    }
-
-    pub fn handle_timer_event(&mut self) -> Result<(), TrySendError<Message>> {
-        self.timer.reset_event();
-        self.mailbox.try_send(Message::TimerTick)
-    }
 }
 
 enum State<O> {
@@ -85,15 +57,13 @@ where
     }
 }
 
-pub struct GameDriver<'a, T, O> {
+pub struct GameDriver<'a, O> {
     // `None` value is used to implement [Jone's trick](https://matklad.github.io/2019/07/25/unsafe-as-a-type-system.html),
     // any user-facing `None` is considered a bug. I.e. the user may assume to always interact with a `Some(...)`.
     s: Option<State<O>>,
     _button_a: BTN_A,
     _button_b: BTN_B,
-    _timer_sender: Sender<'a, Message, MAILBOX_CAPACITY>,
-    timer_receiver: Receiver<'a, Message, MAILBOX_CAPACITY>,
-    timer_handler: Option<TimerHandler<'a, T, Periodic>>,
+    mailbox: Receiver<'a, Message, MAILBOX_CAPACITY>,
 }
 
 /// This mailbox capacity belongs to [`GameDriver`], but since [`GameDriver`] is
@@ -102,21 +72,16 @@ pub struct GameDriver<'a, T, O> {
 /// the capacity is defined as free constant.
 pub const MAILBOX_CAPACITY: usize = 4;
 
-impl<'a, T, O> GameDriver<'a, T, O>
+impl<'a, O> GameDriver<'a, O>
 where
-    T: Instance,
     O: Observer + Debug,
 {
-    const GAME_TICK_FREQ: u32 = 1; // TODO: make this 2 as soon as you implement softdrop
-    const GAME_TICK_CYCLES: u32 = Timer::<T, Periodic>::TICKS_PER_SECOND / Self::GAME_TICK_FREQ;
-
     /// Note: the contained peripherals start generating events right away, so be sure to
     /// set up the event handling as fast as possible
     pub fn new(
         button_a: BTN_A,
         button_b: BTN_B,
-        timer: T,
-        timer_channel: &'a mut Channel<Message, MAILBOX_CAPACITY>,
+        mailbox: Receiver<'a, Message, MAILBOX_CAPACITY>,
         o: O,
     ) -> Self {
         // initialize the game
@@ -126,33 +91,23 @@ where
         game.set_observer(o)
             .expect("newly initialized game should not have observer set");
 
-        // initialize the timer
-        let mut game_tick = Timer::periodic(timer);
-        game_tick.reset_event(); // out of caution
-        game_tick.enable_interrupt();
-        game_tick.start(Self::GAME_TICK_CYCLES);
-
-        let (sender, receiver) = timer_channel.split();
-
         Self {
             s: Some(State::_TileFloating(game)),
             _button_a: button_a,
             _button_b: button_b,
-            _timer_sender: sender.clone(),
-            timer_receiver: receiver,
-            timer_handler: Some(TimerHandler::new(sender.clone(), game_tick)),
+            mailbox,
         }
     }
 
     pub async fn run(&mut self) -> Result<(), DriverError> {
         loop {
-            let msg = self.timer_receiver.recv().await.map_err(|e| match e {
+            let msg = self.mailbox.recv().await.map_err(|e| match e {
                 ReceiveError::Empty => unreachable!(""),
                 ReceiveError::NoSender => DriverError::SenderDropped,
             })?;
             defmt::debug!(
                 "consuming message, more messages pending: {}",
-                !self.timer_receiver.is_empty()
+                !self.mailbox.is_empty()
             );
 
             match msg {
@@ -171,19 +126,6 @@ where
                 Message::BtnBPress => todo!(),
             }
         }
-    }
-
-    pub fn get_timer_handler(&mut self) -> Option<TimerHandler<'a, T, Periodic>> {
-        self.timer_handler.take()
-    }
-
-    pub fn return_timer_handler(&mut self, handler: TimerHandler<'a, T, Periodic>) {
-        if self.timer_handler.is_some() {
-            unreachable!(
-                "There can be at most one object of type TimerHandler over the programs entire lifetime"
-            )
-        }
-        self.timer_handler = Some(handler);
     }
 }
 
