@@ -54,6 +54,18 @@ where
             },
         }
     }
+
+    fn rotate(self) -> Self {
+        if let State::TileFloating(mut game) = self {
+            if game.rotate_tile().is_err() {
+                defmt::trace!("Ignoring invalid rotation");
+            }
+            State::TileFloating(game)
+        } else {
+            defmt::trace!("Ignoring rotation due to invalid state");
+            self
+        }
+    }
 }
 
 pub struct GameDriver<'a, O> {
@@ -113,7 +125,14 @@ where
                     self.s = state.map(State::tick);
                 }
                 Message::BtnAPress => todo!(),
-                Message::BtnBPress => todo!(),
+                Message::BtnBPress => {
+                    let state = self.s.take();
+                    if state.is_none() {
+                        unreachable!("GameDriver should always be in a defined state");
+                    }
+
+                    self.s = state.map(State::rotate);
+                }
             }
         }
     }
