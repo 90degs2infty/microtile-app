@@ -15,19 +15,21 @@ mod app {
     use microbit::{
         display::nonblocking::{Display, Frame, MicrobitFrame},
         hal::{
+            gpiote::Gpiote,
             prelude::_embedded_hal_timer_CountDown,
             timer::{Instance, Periodic, Timer},
         },
         pac::{
-            NVIC, TIMER0 as LowLevelDisplayDriver, TIMER1 as HighLevelDisplayDriver,
+            GPIOTE, NVIC, TIMER0 as LowLevelDisplayDriver, TIMER1 as HighLevelDisplayDriver,
             TIMER2 as TimerGameDriver,
         },
         Board,
     };
     use microtile_app::{
         device::{
+            button::{GpioResources, RotationDriver, Started as RotationStarted},
             display::GridRenderer,
-            timer::{GameTickDriver, Started},
+            timer::{GameTickDriver, Started as TickStarted},
         },
         game::{GameDriver, Message, MAILBOX_CAPACITY},
     };
@@ -65,10 +67,18 @@ mod app {
     struct Local {
         highlevel_display_driver: Timer<HighLevelDisplayDriver, Periodic>,
         game_driver: &'static mut GameDriver<'static, GameObserver>,
-        timer_handler: &'static mut GameTickDriver<'static, TimerGameDriver, Started>,
+        timer_handler: &'static mut GameTickDriver<'static, TimerGameDriver, TickStarted>,
+        rotation_handler: &'static mut RotationDriver<'static, 'static, RotationStarted>,
     }
 
-    #[init(local = [ game_driver_channel: Channel<Message, MAILBOX_CAPACITY> = Channel::new(), game_driver_mem: MaybeUninit<GameDriver<'static, GameObserver>> = MaybeUninit::uninit(), timer_handler_mem: MaybeUninit<GameTickDriver<'static, TimerGameDriver, Started>> = MaybeUninit::uninit() ])]
+    #[init(local = [
+        game_driver_channel: Channel<Message, MAILBOX_CAPACITY> = Channel::new(),
+        game_driver_mem: MaybeUninit<GameDriver<'static, GameObserver>> = MaybeUninit::uninit(),
+        timer_handler_mem: MaybeUninit<GameTickDriver<'static, TimerGameDriver, TickStarted>> = MaybeUninit::uninit(),
+        gpiote_mem: MaybeUninit<Gpiote> = MaybeUninit::uninit(),
+        rotation_resources_mem: MaybeUninit<GpioResources<'static>> = MaybeUninit::uninit(),
+        rotation_handler_mem: MaybeUninit<RotationDriver<'static, 'static, RotationStarted>> = MaybeUninit::uninit()
+    ])]
     fn init(cx: init::Context) -> (Shared, Local) {
         defmt::info!("init");
 
@@ -87,6 +97,20 @@ mod app {
             GameTickDriver::new(sender.clone(), board.buttons.button_a, board.TIMER2).start(),
         );
         let timer_handler = unsafe { cx.local.timer_handler_mem.assume_init_mut() };
+
+        cx.local.gpiote_mem.write(Gpiote::new(board.GPIOTE));
+        let gpiote = unsafe { cx.local.gpiote_mem.assume_init_mut() };
+        cx.local.rotation_resources_mem.write(GpioResources::new(
+            gpiote.channel0(),
+            board.buttons.button_b,
+        ));
+        let rotation_resources: &'static mut GpioResources<'static> =
+            unsafe { cx.local.rotation_resources_mem.assume_init_mut() };
+
+        cx.local
+            .rotation_handler_mem
+            .write(RotationDriver::new(rotation_resources, sender.clone()).start());
+        let rotation_handler = unsafe { cx.local.rotation_handler_mem.assume_init_mut() };
 
         drive_game::spawn().ok();
 
@@ -112,6 +136,7 @@ mod app {
                 highlevel_display_driver: highlevel_display,
                 game_driver,
                 timer_handler,
+                rotation_handler,
             },
         )
     }
@@ -183,5 +208,16 @@ mod app {
             merged_frame.set(&GridRenderer::new(&active.union(passive)));
         });
         defmt::trace!("leaving frame update");
+    }
+
+    #[task(binds = GPIOTE, priority = 4, local = [ rotation_handler ])]
+    fn rotate_tile(cx: rotate_tile::Context) {
+        match cx.local.rotation_handler.handle_button_event() {
+            Ok(()) => {}
+            Err(TrySendError::Full(_)) => {
+                defmt::debug!("dropping tile rotation to allow the engine to catch up");
+            }
+            Err(TrySendError::NoReceiver(_)) => unreachable!(),
+        };
     }
 }
