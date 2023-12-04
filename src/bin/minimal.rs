@@ -25,8 +25,8 @@ mod app {
         Board,
     };
     use microtile_app::{
-        device::display::GridRenderer,
-        game::{GameDriver, Message, TimerHandler, MAILBOX_CAPACITY},
+        device::{display::GridRenderer, timer::GameTickDriver},
+        game::{GameDriver, Message, MAILBOX_CAPACITY},
     };
     use microtile_engine::{gameplay::game::Observer, geometry::grid::Grid};
     use rtic_sync::channel::{Channel, TrySendError};
@@ -61,11 +61,11 @@ mod app {
     #[local]
     struct Local {
         highlevel_display_driver: Timer<HighLevelDisplayDriver, Periodic>,
-        game_driver: &'static mut GameDriver<'static, TimerGameDriver, GameObserver>,
-        game_driver_timer_handler: &'static mut TimerHandler<'static, TimerGameDriver, Periodic>,
+        game_driver: &'static mut GameDriver<'static, GameObserver>,
+        timer_handler: &'static mut GameTickDriver<'static, TimerGameDriver>,
     }
 
-    #[init(local = [ timer_channel: Channel<Message, MAILBOX_CAPACITY> = Channel::new(), game_driver_mem: MaybeUninit<GameDriver<'static, TimerGameDriver, GameObserver>> = MaybeUninit::uninit(), game_driver_timer_handler_mem: MaybeUninit<TimerHandler<'static, TimerGameDriver, Periodic>> = MaybeUninit::uninit() ])]
+    #[init(local = [ game_driver_channel: Channel<Message, MAILBOX_CAPACITY> = Channel::new(), game_driver_mem: MaybeUninit<GameDriver<'static, GameObserver>> = MaybeUninit::uninit(), timer_handler_mem: MaybeUninit<GameTickDriver<'static, TimerGameDriver>> = MaybeUninit::uninit() ])]
     fn init(cx: init::Context) -> (Shared, Local) {
         defmt::info!("init");
 
@@ -73,22 +73,17 @@ mod app {
 
         let observer = GameObserver {};
 
-        cx.local.game_driver_mem.write(GameDriver::new(
-            board.buttons.button_a,
-            board.buttons.button_b,
-            board.TIMER2,
-            cx.local.timer_channel,
-            observer,
-        ));
-        let game_driver = unsafe { cx.local.game_driver_mem.assume_init_mut() };
-        let game_driver_timer_handler = game_driver
-            .get_timer_handler()
-            .expect("freshly initialized driver should still have handler available");
+        let (sender, receiver) = cx.local.game_driver_channel.split();
+
         cx.local
-            .game_driver_timer_handler_mem
-            .write(game_driver_timer_handler);
-        let game_driver_timer_handler =
-            unsafe { cx.local.game_driver_timer_handler_mem.assume_init_mut() };
+            .game_driver_mem
+            .write(GameDriver::new(receiver, observer));
+        let game_driver = unsafe { cx.local.game_driver_mem.assume_init_mut() };
+
+        cx.local
+            .timer_handler_mem
+            .write(GameTickDriver::new(sender.clone(), board.TIMER2));
+        let timer_handler = unsafe { cx.local.timer_handler_mem.assume_init_mut() };
 
         drive_game::spawn().ok();
 
@@ -113,7 +108,7 @@ mod app {
             Local {
                 highlevel_display_driver: highlevel_display,
                 game_driver,
-                game_driver_timer_handler,
+                timer_handler,
             },
         )
     }
@@ -166,9 +161,9 @@ mod app {
         let _ = cx.local.game_driver.run().await;
     }
 
-    #[task(binds = TIMER2, priority = 4, local = [ game_driver_timer_handler ])]
+    #[task(binds = TIMER2, priority = 4, local = [ timer_handler ])]
     fn tick_game(cx: tick_game::Context) {
-        match cx.local.game_driver_timer_handler.handle_timer_event() {
+        match cx.local.timer_handler.handle_timer_event() {
             Ok(()) => {}
             Err(TrySendError::Full(_)) => {
                 defmt::debug!("dropping game tick to allow the engine to catch up");
