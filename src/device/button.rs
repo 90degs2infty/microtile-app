@@ -53,7 +53,14 @@ impl<'a, 'b> RotationDriver<'a, 'b, Stopped> {
 impl<'a, 'b> RotationDriver<'a, 'b, Started> {
     #[must_use]
     pub fn stop(self) -> RotationDriver<'a, 'b, Stopped> {
-        todo!()
+        self.button_event.disable_interrupt();
+        self.gpiote_channel.reset_events();
+        RotationDriver {
+            gpiote_channel: self.gpiote_channel,
+            button_event: self.button_event,
+            command_pipe: self.command_pipe,
+            s: PhantomData,
+        }
     }
 
     pub fn handle_button_event(&mut self) -> Result<(), TrySendError<Message>> {
