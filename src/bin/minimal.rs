@@ -119,7 +119,7 @@ mod app {
                 board.i2c_internal,
                 &mut delay,
             )
-            .start(),
+            .start(&mut delay),
         );
         let horizontal_handler = unsafe { cx.local.horizontal_handler_mem.assume_init_mut() };
 

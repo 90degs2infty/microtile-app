@@ -58,10 +58,11 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Stopped> {
         delay: &mut D,
     ) -> Self
     where
-        D: DelayUs<u32>,
         T: Instance,
         P: Into<Pins>,
+        D: DelayUs<u32>,
     {
+        defmt::trace!("new enter");
         irq.channel.reset_events();
 
         let event = irq.channel.input_pin(&irq.i2c_irq);
@@ -72,16 +73,19 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Stopped> {
         let mut accel = Lsm303agr::new_with_i2c(i2c);
         accel.init().expect("Failed to initialize accelerometer");
 
+        defmt::trace!("accel init done");
+
+        accel
+            .set_accel_scale(AccelScale::G2)
+            .expect("Failed to set accelerometer scale");
+
+        defmt::trace!("accel set scale done");
+
         accel
             .acc_disable_interrupt(Interrupt::DataReady1)
             .expect("Failed to disable the DRY1 interrupt");
 
-        accel
-            .set_accel_mode_and_odr(delay, AccelMode::Normal, AccelOutputDataRate::Hz25)
-            .expect("Failed to set accelerometer mode and odr");
-        accel
-            .set_accel_scale(AccelScale::G2)
-            .expect("Failed to set accelerometer scale");
+        defmt::trace!("new leave");
 
         Self {
             command_pipe: mailbox,
@@ -92,18 +96,34 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Stopped> {
         }
     }
 
-    pub fn start<CommE, PinE>(mut self) -> HorizontalMovementDriver<'a, 'b, T, Started>
+    pub fn start<D, CommE, PinE>(
+        mut self,
+        delay: &mut D,
+    ) -> HorizontalMovementDriver<'a, 'b, T, Started>
     where
         I2cInterface<Twim<T>>:
             ReadData<Error = Error<CommE, PinE>> + WriteData<Error = Error<CommE, PinE>>,
         CommE: Debug,
         PinE: Debug,
+        D: DelayUs<u32>,
     {
+        defmt::trace!("start");
+        defmt::trace!("enable gpio interrupt");
         self.irq_event.enable_interrupt();
+
+        defmt::trace!("enable accel interrupt");
 
         self.accel
             .acc_enable_interrupt(Interrupt::DataReady1)
             .expect("Failed to enable accel interrupt");
+
+        defmt::trace!("set accel mode");
+
+        self.accel
+            .set_accel_mode_and_odr(delay, AccelMode::Normal, AccelOutputDataRate::Hz25)
+            .expect("Failed to set accelerometer mode and odr");
+        defmt::trace!("leaving start");
+
         HorizontalMovementDriver {
             command_pipe: self.command_pipe,
             accel: self.accel,
@@ -133,6 +153,8 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Started> {
         CommE: Debug,
         PinE: Debug,
     {
+        defmt::trace!("handle_accel_event()");
+
         // We have to check the channel for having a pending event, because of the way
         // the Gpiote peripheral works: there is a single Gpiote IRQ which gets pended
         // if there is an event _on any_ of the available channels.
