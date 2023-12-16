@@ -64,6 +64,8 @@ jobs:
           toolchain: nightly
           target: thumbv7em-none-eabihf
       - uses: Swatinem/rust-cache@v2
+      - name: Install `flip-link`
+        run: cargo install flip-link
       - name: Build application in ${{ matrix.profile }} profile
         run: cargo build --profile ${{ matrix.profile }}
       - name: Upload binary in ${{ matrix.profile }} profile
