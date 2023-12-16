@@ -22,6 +22,7 @@ mod app {
     use microbit::{
         display::nonblocking::{Display, Frame, MicrobitFrame},
         hal::{
+            gpiote::Gpiote,
             prelude::_embedded_hal_timer_CountDown,
             timer::{Instance, Periodic, Timer},
         },
@@ -32,8 +33,12 @@ mod app {
         Board,
     };
     use microtile_app::{
-        device::display::GridRenderer,
-        game::{GameDriver, Message, TimerHandler, MAILBOX_CAPACITY},
+        device::{
+            button::{GpioResources, RotationDriver, Started as RotationStarted},
+            display::GridRenderer,
+            timer::{GameTickDriver, Started as TickStarted},
+        },
+        game::{GameDriver, Message, MAILBOX_CAPACITY},
     };
     use microtile_engine::{gameplay::game::Observer, geometry::grid::Grid};
     use rtic_sync::channel::{Channel, TrySendError};
@@ -68,11 +73,19 @@ mod app {
     #[local]
     struct Local {
         highlevel_display_driver: Timer<HighLevelDisplayDriver, Periodic>,
-        game_driver: &'static mut GameDriver<'static, TimerGameDriver, GameObserver>,
-        game_driver_timer_handler: &'static mut TimerHandler<'static, TimerGameDriver, Periodic>,
+        game_driver: &'static mut GameDriver<'static, GameObserver>,
+        timer_handler: &'static mut GameTickDriver<'static, TimerGameDriver, TickStarted>,
+        rotation_handler: &'static mut RotationDriver<'static, 'static, RotationStarted>,
     }
 
-    #[init(local = [ timer_channel: Channel<Message, MAILBOX_CAPACITY> = Channel::new(), game_driver_mem: MaybeUninit<GameDriver<'static, TimerGameDriver, GameObserver>> = MaybeUninit::uninit(), game_driver_timer_handler_mem: MaybeUninit<TimerHandler<'static, TimerGameDriver, Periodic>> = MaybeUninit::uninit() ])]
+    #[init(local = [
+        game_driver_channel: Channel<Message, MAILBOX_CAPACITY> = Channel::new(),
+        game_driver_mem: MaybeUninit<GameDriver<'static, GameObserver>> = MaybeUninit::uninit(),
+        timer_handler_mem: MaybeUninit<GameTickDriver<'static, TimerGameDriver, TickStarted>> = MaybeUninit::uninit(),
+        gpiote_mem: MaybeUninit<Gpiote> = MaybeUninit::uninit(),
+        rotation_resources_mem: MaybeUninit<GpioResources<'static>> = MaybeUninit::uninit(),
+        rotation_handler_mem: MaybeUninit<RotationDriver<'static, 'static, RotationStarted>> = MaybeUninit::uninit()
+    ])]
     fn init(cx: init::Context) -> (Shared, Local) {
         defmt::info!("init");
 
@@ -80,22 +93,31 @@ mod app {
 
         let observer = GameObserver {};
 
-        cx.local.game_driver_mem.write(GameDriver::new(
-            board.buttons.button_a,
-            board.buttons.button_b,
-            board.TIMER2,
-            cx.local.timer_channel,
-            observer,
-        ));
-        let game_driver = unsafe { cx.local.game_driver_mem.assume_init_mut() };
-        let game_driver_timer_handler = game_driver
-            .get_timer_handler()
-            .expect("freshly initialized driver should still have handler available");
+        let (sender, receiver) = cx.local.game_driver_channel.split();
+
         cx.local
-            .game_driver_timer_handler_mem
-            .write(game_driver_timer_handler);
-        let game_driver_timer_handler =
-            unsafe { cx.local.game_driver_timer_handler_mem.assume_init_mut() };
+            .game_driver_mem
+            .write(GameDriver::new(receiver, observer));
+        let game_driver = unsafe { cx.local.game_driver_mem.assume_init_mut() };
+
+        cx.local.timer_handler_mem.write(
+            GameTickDriver::new(sender.clone(), board.buttons.button_a, board.TIMER2).start(),
+        );
+        let timer_handler = unsafe { cx.local.timer_handler_mem.assume_init_mut() };
+
+        cx.local.gpiote_mem.write(Gpiote::new(board.GPIOTE));
+        let gpiote = unsafe { cx.local.gpiote_mem.assume_init_mut() };
+        cx.local.rotation_resources_mem.write(GpioResources::new(
+            gpiote.channel0(),
+            board.buttons.button_b,
+        ));
+        let rotation_resources: &'static mut GpioResources<'static> =
+            unsafe { cx.local.rotation_resources_mem.assume_init_mut() };
+
+        cx.local
+            .rotation_handler_mem
+            .write(RotationDriver::new(rotation_resources, sender.clone()).start());
+        let rotation_handler = unsafe { cx.local.rotation_handler_mem.assume_init_mut() };
 
         drive_game::spawn().ok();
 
@@ -120,7 +142,8 @@ mod app {
             Local {
                 highlevel_display_driver: highlevel_display,
                 game_driver,
-                game_driver_timer_handler,
+                timer_handler,
+                rotation_handler,
             },
         )
     }
@@ -173,9 +196,9 @@ mod app {
         let _ = cx.local.game_driver.run().await;
     }
 
-    #[task(binds = TIMER2, priority = 4, local = [ game_driver_timer_handler ])]
+    #[task(binds = TIMER2, priority = 4, local = [ timer_handler ])]
     fn tick_game(cx: tick_game::Context) {
-        match cx.local.game_driver_timer_handler.handle_timer_event() {
+        match cx.local.timer_handler.handle_timer_event() {
             Ok(()) => {}
             Err(TrySendError::Full(_)) => {
                 defmt::debug!("dropping game tick to allow the engine to catch up");
@@ -192,5 +215,16 @@ mod app {
             merged_frame.set(&GridRenderer::new(&active.union(&passive)));
         });
         defmt::trace!("leaving frame update");
+    }
+
+    #[task(binds = GPIOTE, priority = 4, local = [ rotation_handler ])]
+    fn rotate_tile(cx: rotate_tile::Context) {
+        match cx.local.rotation_handler.handle_button_event() {
+            Ok(()) => {}
+            Err(TrySendError::Full(_)) => {
+                defmt::debug!("dropping tile rotation to allow the engine to catch up");
+            }
+            Err(TrySendError::NoReceiver(_)) => unreachable!(),
+        };
     }
 }
