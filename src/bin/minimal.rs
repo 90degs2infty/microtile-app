@@ -249,7 +249,7 @@ mod app {
     }
 
     #[task(binds = GPIOTE, priority = 4, local = [ rotation_handler, horizontal_handler ])]
-    fn rotate_tile(cx: rotate_tile::Context) {
+    fn handle_gpio_events(cx: handle_gpio_events::Context) {
         // TODO: pull out detection of who is responsible for the event handling?
         match cx.local.rotation_handler.handle_button_event() {
             Ok(()) => {}
