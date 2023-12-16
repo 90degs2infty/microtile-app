@@ -35,7 +35,7 @@ mod app {
     use microtile_app::{
         device::{
             accel::{
-                GpioResources as HorizontalIrqResources, HorizontalMovementDriver,
+                AccelError, GpioResources as HorizontalIrqResources, HorizontalMovementDriver,
                 Started as HorizontalStarted,
             },
             button::{GpioResources, RotationDriver, Started as RotationStarted},
@@ -260,10 +260,13 @@ mod app {
         };
         match cx.local.horizontal_handler.handle_accel_event() {
             Ok(()) => {}
-            Err(TrySendError::Full(_)) => {
+            Err(AccelError::ConsumerError(TrySendError::Full(_))) => {
                 defmt::debug!("dropping horizontal tile movement to allow the engine to catch up");
             }
-            Err(TrySendError::NoReceiver(_)) => unreachable!(),
+            Err(AccelError::ConsumerError(TrySendError::NoReceiver(_))) => unreachable!(),
+            Err(AccelError::ProducerError(e)) => {
+                defmt::debug!("failed handling accelerometer event due to '{:?}'", e);
+            }
         }
     }
 }

@@ -40,6 +40,25 @@ impl<'b> GpioResources<'b> {
     }
 }
 
+pub enum AccelError<CommE, PinE> {
+    /// Error related to the accelerometer
+    ProducerError(Error<CommE, PinE>),
+    /// Error related to the data consuming channel
+    ConsumerError(TrySendError<Message>),
+}
+
+impl<CommE, PinE> From<TrySendError<Message>> for AccelError<CommE, PinE> {
+    fn from(value: TrySendError<Message>) -> Self {
+        Self::ConsumerError(value)
+    }
+}
+
+impl<CommE, PinE> From<Error<CommE, PinE>> for AccelError<CommE, PinE> {
+    fn from(value: Error<CommE, PinE>) -> Self {
+        Self::ProducerError(value)
+    }
+}
+
 #[must_use]
 pub struct HorizontalMovementDriver<'a, 'b, T, S> {
     command_pipe: Sender<'a, Message, MAILBOX_CAPACITY>,
@@ -139,7 +158,7 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Started> {
         todo!()
     }
 
-    pub fn handle_accel_event<CommE, PinE>(&mut self) -> Result<(), TrySendError<Message>>
+    pub fn handle_accel_event<CommE, PinE>(&mut self) -> Result<(), AccelError<CommE, PinE>>
     where
         I2cInterface<Twim<T>>:
             ReadData<Error = Error<CommE, PinE>> + WriteData<Error = Error<CommE, PinE>>,
@@ -158,7 +177,7 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Started> {
             let data = self
                 .accel
                 .acceleration()
-                .expect("Failed to acquire acceleration data");
+                .map_err(<Error<CommE, PinE> as Into<AccelError<CommE, PinE>>>::into)?;
             defmt::trace!(
                 "Acceleration: {} {} {}",
                 data.x_mg(),
