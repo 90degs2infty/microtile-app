@@ -154,8 +154,36 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Stopped> {
 }
 
 impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Started> {
-    pub fn stop() -> HorizontalMovementDriver<'a, 'b, T, Stopped> {
-        todo!()
+    pub fn stop<CommE, PinE, D>(
+        mut self,
+        delay: &mut D,
+    ) -> HorizontalMovementDriver<'a, 'b, T, Stopped>
+    where
+        I2cInterface<Twim<T>>:
+            ReadData<Error = Error<CommE, PinE>> + WriteData<Error = Error<CommE, PinE>>,
+        CommE: Debug,
+        PinE: Debug,
+        D: DelayUs<u32>,
+    {
+        defmt::warn!("Stopping the horizontal movement driver is currently untested. The accelerometer is prone to blocking.");
+
+        self.irq_event.disable_interrupt();
+
+        self.accel
+            .acc_disable_interrupt(Interrupt::DataReady1)
+            .expect("Failed to disabel accel interrupt");
+
+        self.accel
+            .set_accel_mode_and_odr(delay, AccelMode::PowerDown, AccelOutputDataRate::Hz1)
+            .expect("Failed to set accelerometer mode and odr");
+
+        HorizontalMovementDriver {
+            command_pipe: self.command_pipe,
+            accel: self.accel,
+            i2c_irq: self.i2c_irq,
+            irq_event: self.irq_event,
+            s: PhantomData,
+        }
     }
 
     pub fn handle_accel_event<CommE, PinE>(&mut self) -> Result<(), AccelError<CommE, PinE>>
