@@ -4,6 +4,10 @@ name = "microtile-app"
 edition = "2021"
 version = "0.1.0"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/90degs2infty/microtile-app"
+categories = [ "embedded", "games", "no-std" ]
+keywords = [ "microbit", "rtic" ]
+description = "A microscopic Tetris® inspired application, targeting the BBC micro:bit v2."
 
 [dependencies]
 cortex-m = { version = "0.7", features = ["critical-section-single-core"] }
