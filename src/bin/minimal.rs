@@ -7,7 +7,7 @@
 use microtile_app as _; // global logger + panicking-behavior + memory layout
 
 #[rtic::app(
-    device = microbit::pac,
+    device = microbit_pac,
     dispatchers = [SWI0_EGU0]
 )]
 mod app {
@@ -19,8 +19,8 @@ mod app {
             timer::{Instance, Periodic, Timer},
         },
         pac::{
-            NVIC, TIMER0 as LowLevelDisplayDriver, TIMER1 as HighLevelDisplayDriver,
-            TIMER2 as TimerGameDriver,
+            self as microbit_pac, NVIC, TIMER0 as LowLevelDisplayDriver,
+            TIMER1 as HighLevelDisplayDriver, TIMER2 as TimerGameDriver,
         },
         Board,
     };
