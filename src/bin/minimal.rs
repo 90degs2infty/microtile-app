@@ -182,7 +182,7 @@ mod app {
         defmt::trace!("entering frame update");
         (cx.shared.merged_frame, cx.shared.passive_frame).lock(|merged_frame, passive_frame| {
             passive_frame.set(&GridRenderer::new(&passive));
-            merged_frame.set(&GridRenderer::new(&active.union(passive)));
+            merged_frame.set(&GridRenderer::new(&active.union(&passive)));
         });
         defmt::trace!("leaving frame update");
     }
