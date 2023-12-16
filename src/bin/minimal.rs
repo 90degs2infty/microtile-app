@@ -258,14 +258,15 @@ mod app {
             }
             Err(TrySendError::NoReceiver(_)) => unreachable!(),
         };
+        #[allow(clippy::match_same_arms)]
         match cx.local.horizontal_handler.handle_accel_event() {
             Ok(()) => {}
             Err(AccelError::ConsumerError(TrySendError::Full(_))) => {
                 defmt::debug!("dropping horizontal tile movement to allow the engine to catch up");
             }
             Err(AccelError::ConsumerError(TrySendError::NoReceiver(_))) => unreachable!(),
-            Err(AccelError::ProducerError(e)) => {
-                defmt::debug!("failed handling accelerometer event due to '{:?}'", e);
+            Err(AccelError::ProducerError(_)) => {
+                defmt::debug!("failed handling accelerometer event due to lsm303agr error");
             }
         }
     }
