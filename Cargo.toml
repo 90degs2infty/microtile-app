@@ -22,6 +22,7 @@ microtile-engine = { git = "https://github.com/90degs2infty/microtile-engine.git
 tiny-led-matrix = "1.0.2"
 rtic-sync = "1.0.2"
 either = { version = "1.9.0", default_features = false }
+lsm303agr = "0.3.0"
 
 # cargo build/run
 [profile.dev]

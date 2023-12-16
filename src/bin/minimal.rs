@@ -28,14 +28,19 @@ mod app {
         },
         pac::{
             self as microbit_pac, NVIC, TIMER0 as LowLevelDisplayDriver,
-            TIMER1 as HighLevelDisplayDriver, TIMER2 as TimerGameDriver,
+            TIMER1 as HighLevelDisplayDriver, TIMER2 as TimerGameDriver, TWIM0 as HorizontalDriver,
         },
         Board,
     };
     use microtile_app::{
         device::{
+            accel::{
+                AccelError, GpioResources as HorizontalIrqResources, HorizontalMovementDriver,
+                Started as HorizontalStarted,
+            },
             button::{GpioResources, RotationDriver, Started as RotationStarted},
             display::GridRenderer,
+            errata::clear_int_i2c_interrupt_line,
             timer::{GameTickDriver, Started as TickStarted},
         },
         game::{GameDriver, Message, MAILBOX_CAPACITY},
@@ -76,6 +81,12 @@ mod app {
         game_driver: &'static mut GameDriver<'static, GameObserver>,
         timer_handler: &'static mut GameTickDriver<'static, TimerGameDriver, TickStarted>,
         rotation_handler: &'static mut RotationDriver<'static, 'static, RotationStarted>,
+        horizontal_handler: &'static mut HorizontalMovementDriver<
+            'static,
+            'static,
+            HorizontalDriver,
+            HorizontalStarted,
+        >,
     }
 
     #[init(local = [
@@ -84,16 +95,38 @@ mod app {
         timer_handler_mem: MaybeUninit<GameTickDriver<'static, TimerGameDriver, TickStarted>> = MaybeUninit::uninit(),
         gpiote_mem: MaybeUninit<Gpiote> = MaybeUninit::uninit(),
         rotation_resources_mem: MaybeUninit<GpioResources<'static>> = MaybeUninit::uninit(),
-        rotation_handler_mem: MaybeUninit<RotationDriver<'static, 'static, RotationStarted>> = MaybeUninit::uninit()
+        rotation_handler_mem: MaybeUninit<RotationDriver<'static, 'static, RotationStarted>> = MaybeUninit::uninit(),
+        horizontal_resources_mem: MaybeUninit<HorizontalIrqResources<'static>> = MaybeUninit::uninit(),
+        horizontal_handler_mem: MaybeUninit<HorizontalMovementDriver<'static, 'static, HorizontalDriver, HorizontalStarted>> = MaybeUninit::uninit()
     ])]
     fn init(cx: init::Context) -> (Shared, Local) {
         defmt::info!("init");
 
         let board = Board::new(cx.device, cx.core);
 
+        let mut delay = Timer::new(board.TIMER2);
+        let (twim0, pins) =
+            clear_int_i2c_interrupt_line(board.TWIM0, board.i2c_internal, &mut delay);
+
         let observer = GameObserver {};
 
         let (sender, receiver) = cx.local.game_driver_channel.split();
+
+        cx.local.gpiote_mem.write(Gpiote::new(board.GPIOTE));
+        let gpiote = unsafe { cx.local.gpiote_mem.assume_init_mut() };
+
+        let irq_line = board.pins.p0_25.into_pullup_input();
+        cx.local
+            .horizontal_resources_mem
+            .write(HorizontalIrqResources::new(gpiote.channel1(), irq_line));
+        let horizontal_resources: &'static mut HorizontalIrqResources<'static> =
+            unsafe { cx.local.horizontal_resources_mem.assume_init_mut() };
+
+        cx.local.horizontal_handler_mem.write(
+            HorizontalMovementDriver::new(horizontal_resources, sender.clone(), twim0, pins)
+                .start(&mut delay),
+        );
+        let horizontal_handler = unsafe { cx.local.horizontal_handler_mem.assume_init_mut() };
 
         cx.local
             .game_driver_mem
@@ -101,12 +134,10 @@ mod app {
         let game_driver = unsafe { cx.local.game_driver_mem.assume_init_mut() };
 
         cx.local.timer_handler_mem.write(
-            GameTickDriver::new(sender.clone(), board.buttons.button_a, board.TIMER2).start(),
+            GameTickDriver::new(sender.clone(), board.buttons.button_a, delay.free()).start(),
         );
         let timer_handler = unsafe { cx.local.timer_handler_mem.assume_init_mut() };
 
-        cx.local.gpiote_mem.write(Gpiote::new(board.GPIOTE));
-        let gpiote = unsafe { cx.local.gpiote_mem.assume_init_mut() };
         cx.local.rotation_resources_mem.write(GpioResources::new(
             gpiote.channel0(),
             board.buttons.button_b,
@@ -144,6 +175,7 @@ mod app {
                 game_driver,
                 timer_handler,
                 rotation_handler,
+                horizontal_handler,
             },
         )
     }
@@ -217,8 +249,9 @@ mod app {
         defmt::trace!("leaving frame update");
     }
 
-    #[task(binds = GPIOTE, priority = 4, local = [ rotation_handler ])]
-    fn rotate_tile(cx: rotate_tile::Context) {
+    #[task(binds = GPIOTE, priority = 4, local = [ rotation_handler, horizontal_handler ])]
+    fn handle_gpio_events(cx: handle_gpio_events::Context) {
+        // TODO: pull out detection of who is responsible for the event handling?
         match cx.local.rotation_handler.handle_button_event() {
             Ok(()) => {}
             Err(TrySendError::Full(_)) => {
@@ -226,5 +259,16 @@ mod app {
             }
             Err(TrySendError::NoReceiver(_)) => unreachable!(),
         };
+        #[allow(clippy::match_same_arms)]
+        match cx.local.horizontal_handler.handle_accel_event() {
+            Ok(()) => {}
+            Err(AccelError::ConsumerError(TrySendError::Full(_))) => {
+                defmt::debug!("dropping horizontal tile movement to allow the engine to catch up");
+            }
+            Err(AccelError::ConsumerError(TrySendError::NoReceiver(_))) => unreachable!(),
+            Err(AccelError::ProducerError(_)) => {
+                defmt::debug!("failed handling accelerometer event due to lsm303agr error");
+            }
+        }
     }
 }
