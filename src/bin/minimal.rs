@@ -1,13 +1,20 @@
 #![no_main]
 #![no_std]
 #![feature(type_alias_impl_trait)]
-#![warn(clippy::pedantic)]
-#![allow(clippy::ignored_unit_patterns)] // macros from defmt trigger this lint, but are out of our control
+// macros from defmt trigger this lint, but are out of our control
+#![allow(clippy::ignored_unit_patterns)]
+// temporarily ignore missing docs
+#![allow(
+    missing_docs,
+    rustdoc::missing_crate_level_docs,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc
+)]
 
 use microtile_app as _; // global logger + panicking-behavior + memory layout
 
 #[rtic::app(
-    device = microbit::pac,
+    device = microbit_pac,
     dispatchers = [SWI0_EGU0]
 )]
 mod app {
@@ -16,12 +23,12 @@ mod app {
         display::nonblocking::{Display, Frame, MicrobitFrame},
         hal::{
             gpiote::Gpiote,
-            prelude::{InputPin, _embedded_hal_timer_CountDown},
+            prelude::_embedded_hal_timer_CountDown,
             timer::{Instance, Periodic, Timer},
         },
         pac::{
-            NVIC, TIMER0 as LowLevelDisplayDriver, TIMER1 as HighLevelDisplayDriver,
-            TIMER2 as TimerGameDriver, TWIM0 as HorizontalDriver,
+            self as microbit_pac, NVIC, TIMER0 as LowLevelDisplayDriver,
+            TIMER1 as HighLevelDisplayDriver, TIMER2 as TimerGameDriver, TWIM0 as HorizontalDriver,
         },
         Board,
     };
@@ -239,7 +246,7 @@ mod app {
         defmt::trace!("entering frame update");
         (cx.shared.merged_frame, cx.shared.passive_frame).lock(|merged_frame, passive_frame| {
             passive_frame.set(&GridRenderer::new(&passive));
-            merged_frame.set(&GridRenderer::new(&active.union(passive)));
+            merged_frame.set(&GridRenderer::new(&active.union(&passive)));
         });
         defmt::trace!("leaving frame update");
     }

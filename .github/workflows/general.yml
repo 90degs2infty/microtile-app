@@ -1,0 +1,76 @@
+name: General
+
+on: [push, pull_request]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: nightly
+          target: thumbv7em-none-eabihf
+      - uses: Swatinem/rust-cache@v2
+      - name: Check compilation
+        run: cargo check
+
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: nightly
+          target: thumbv7em-none-eabihf
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Enforce formatting
+        run: cargo fmt --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: nightly
+          target: thumbv7em-none-eabihf
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Linting
+        run: cargo clippy -- -D warnings
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - profile: dev
+            target_dir: debug
+          - profile: release
+            target_dir: release
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: nightly
+          target: thumbv7em-none-eabihf
+      - uses: Swatinem/rust-cache@v2
+      - name: Install `flip-link`
+        run: cargo install flip-link
+      - name: Build application in ${{ matrix.profile }} profile
+        run: cargo build --profile ${{ matrix.profile }}
+      - name: Upload binary in ${{ matrix.profile }} profile
+        uses: actions/upload-artifact@v3
+        with:
+          name: microtile-app-${{ matrix.profile }}
+          path: |
+            target/thumbv7em-none-eabihf/${{ matrix.target_dir }}/minimal
