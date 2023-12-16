@@ -40,6 +40,7 @@ impl<'b> GpioResources<'b> {
     }
 }
 
+#[must_use]
 pub struct HorizontalMovementDriver<'a, 'b, T, S> {
     command_pipe: Sender<'a, Message, MAILBOX_CAPACITY>,
     accel: Lsm303agr<I2cInterface<Twim<T>>, MagOneShot>,
