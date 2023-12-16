@@ -9,7 +9,7 @@ use microbit::{
     hal::{
         gpio::{p0::P0_25, Input, Pin, PullUp},
         gpiote::{GpioteChannel, GpioteChannelEvent},
-        prelude::{InputPin, _embedded_hal_blocking_delay_DelayUs as DelayUs},
+        prelude::_embedded_hal_blocking_delay_DelayUs as DelayUs,
         twim::{Instance, Pins, Twim},
     },
     pac::twim0::frequency::FREQUENCY_A,
@@ -60,7 +60,6 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Stopped> {
         T: Instance,
         P: Into<Pins>,
     {
-        defmt::trace!("new enter");
         irq.channel.reset_events();
 
         let event = irq.channel.input_pin(&irq.i2c_irq);
@@ -79,19 +78,13 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Stopped> {
             "RAII self-test failed for HorizontalMovementDriver: accelerometer returned incorrect ID"
         );
 
-        defmt::trace!("accel init done");
-
         accel
             .set_accel_scale(AccelScale::G2)
             .expect("Failed to set accelerometer scale");
 
-        defmt::trace!("accel set scale done");
-
         accel
             .acc_disable_interrupt(Interrupt::DataReady1)
             .expect("Failed to disable the DRY1 interrupt");
-
-        defmt::trace!("new leave");
 
         Self {
             command_pipe: mailbox,
@@ -113,22 +106,15 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Stopped> {
         PinE: Debug,
         D: DelayUs<u32>,
     {
-        defmt::trace!("start");
-        defmt::trace!("enable gpio interrupt");
         self.irq_event.enable_interrupt();
-
-        defmt::trace!("enable accel interrupt");
 
         self.accel
             .acc_enable_interrupt(Interrupt::DataReady1)
             .expect("Failed to enable accel interrupt");
 
-        defmt::trace!("set accel mode");
-
         self.accel
             .set_accel_mode_and_odr(delay, AccelMode::Normal, AccelOutputDataRate::Hz25)
             .expect("Failed to set accelerometer mode and odr");
-        defmt::trace!("leaving start");
 
         HorizontalMovementDriver {
             command_pipe: self.command_pipe,
@@ -168,7 +154,6 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Started> {
         // https://infocenter.nordicsemi.com/topic/ps_nrf52833/gpiote.html?cp=5_1_0_5_8
         if self.i2c_irq.channel.is_event_triggered() {
             self.i2c_irq.channel.reset_events();
-            defmt::warn!("Accel event");
             self.accel.acceleration().unwrap();
             //self.command_pipe.try_send(Message::BtnBPress)
             Ok(())
