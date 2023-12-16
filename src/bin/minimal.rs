@@ -104,6 +104,10 @@ mod app {
 
         let board = Board::new(cx.device, cx.core);
 
+        let mut delay = Timer::new(board.TIMER2);
+        let (twim0, pins) =
+            clear_int_i2c_interrupt_line(board.TWIM0, board.i2c_internal, &mut delay);
+
         let observer = GameObserver {};
 
         let (sender, receiver) = cx.local.game_driver_channel.split();
@@ -118,9 +122,6 @@ mod app {
         let horizontal_resources: &'static mut HorizontalIrqResources<'static> =
             unsafe { cx.local.horizontal_resources_mem.assume_init_mut() };
 
-        let mut delay = Timer::new(board.TIMER2);
-        let (twim0, pins) =
-            clear_int_i2c_interrupt_line(board.TWIM0, board.i2c_internal, &mut delay);
         cx.local.horizontal_handler_mem.write(
             HorizontalMovementDriver::new(horizontal_resources, sender.clone(), twim0, pins)
                 .start(&mut delay),
