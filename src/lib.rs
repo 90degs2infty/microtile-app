@@ -1,5 +1,12 @@
 #![no_main]
 #![no_std]
+// temporarily ignore missing docs
+#![allow(
+    missing_docs,
+    rustdoc::missing_crate_level_docs,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc
+)]
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 use defmt_rtt as _; // global logger

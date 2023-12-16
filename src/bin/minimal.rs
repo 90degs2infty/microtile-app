@@ -1,8 +1,15 @@
 #![no_main]
 #![no_std]
 #![feature(type_alias_impl_trait)]
-#![warn(clippy::pedantic)]
-#![allow(clippy::ignored_unit_patterns)] // macros from defmt trigger this lint, but are out of our control
+// macros from defmt trigger this lint, but are out of our control
+#![allow(clippy::ignored_unit_patterns)]
+// temporarily ignore missing docs
+#![allow(
+    missing_docs,
+    rustdoc::missing_crate_level_docs,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc
+)]
 
 use microtile_app as _; // global logger + panicking-behavior + memory layout
 
