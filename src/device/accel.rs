@@ -155,7 +155,16 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Started> {
         // https://infocenter.nordicsemi.com/topic/ps_nrf52833/gpiote.html?cp=5_1_0_5_8
         if self.i2c_irq.channel.is_event_triggered() {
             self.i2c_irq.channel.reset_events();
-            self.accel.acceleration().unwrap();
+            let data = self
+                .accel
+                .acceleration()
+                .expect("Failed to acquire acceleration data");
+            defmt::trace!(
+                "Acceleration: {} {} {}",
+                data.x_mg(),
+                data.y_mg(),
+                data.z_mg()
+            );
             //self.command_pipe.try_send(Message::BtnBPress)
             Ok(())
         } else {
