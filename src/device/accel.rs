@@ -50,17 +50,15 @@ pub struct HorizontalMovementDriver<'a, 'b, T, S> {
 
 impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Stopped> {
     // TODO: add pin for interrupt?
-    pub fn new<D, P>(
+    pub fn new<P>(
         irq: &'b GpioResources<'b>,
         mailbox: Sender<'a, Message, MAILBOX_CAPACITY>,
         twim: T,
         bus_pins: P,
-        delay: &mut D,
     ) -> Self
     where
         T: Instance,
         P: Into<Pins>,
-        D: DelayUs<u32>,
     {
         defmt::trace!("new enter");
         irq.channel.reset_events();

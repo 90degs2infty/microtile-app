@@ -40,6 +40,7 @@ mod app {
             },
             button::{GpioResources, RotationDriver, Started as RotationStarted},
             display::GridRenderer,
+            errata::clear_int_i2c_interrupt_line,
             timer::{GameTickDriver, Started as TickStarted},
         },
         game::{GameDriver, Message, MAILBOX_CAPACITY},
@@ -118,15 +119,11 @@ mod app {
             unsafe { cx.local.horizontal_resources_mem.assume_init_mut() };
 
         let mut delay = Timer::new(board.TIMER2);
+        let (twim0, pins) =
+            clear_int_i2c_interrupt_line(board.TWIM0, board.i2c_internal, &mut delay);
         cx.local.horizontal_handler_mem.write(
-            HorizontalMovementDriver::new(
-                horizontal_resources,
-                sender.clone(),
-                board.TWIM0,
-                board.i2c_internal,
-                &mut delay,
-            )
-            .start(&mut delay),
+            HorizontalMovementDriver::new(horizontal_resources, sender.clone(), twim0, pins)
+                .start(&mut delay),
         );
         let horizontal_handler = unsafe { cx.local.horizontal_handler_mem.assume_init_mut() };
 
