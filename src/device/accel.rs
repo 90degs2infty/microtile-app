@@ -71,6 +71,14 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Stopped> {
         let mut accel = Lsm303agr::new_with_i2c(i2c);
         accel.init().expect("Failed to initialize accelerometer");
 
+        let id = accel
+            .accelerometer_id()
+            .expect("Failed to acquire accelerometer ID");
+        assert!(
+            id.is_correct(),
+            "RAII self-test failed for HorizontalMovementDriver: accelerometer returned incorrect ID"
+        );
+
         defmt::trace!("accel init done");
 
         accel
