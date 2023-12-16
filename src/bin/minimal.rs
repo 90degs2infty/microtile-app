@@ -145,10 +145,10 @@ mod app {
     async fn display_toggle_frame(cx: display_toggle_frame::Context) {
         if *cx.local.next_frame_passive {
             (cx.shared.display, cx.shared.passive_frame)
-                .lock(|display, frame| display.show_frame(frame))
+                .lock(|display, frame| display.show_frame(frame));
         } else {
             (cx.shared.display, cx.shared.merged_frame)
-                .lock(|display, frame| display.show_frame(frame))
+                .lock(|display, frame| display.show_frame(frame));
         }
         *cx.local.next_frame_passive = !*cx.local.next_frame_passive;
     }
@@ -171,7 +171,7 @@ mod app {
         match cx.local.game_driver_timer_handler.handle_timer_event() {
             Ok(()) => {}
             Err(TrySendError::Full(_)) => {
-                defmt::debug!("dropping game tick to allow the engine to catch up")
+                defmt::debug!("dropping game tick to allow the engine to catch up");
             }
             Err(TrySendError::NoReceiver(_)) => unreachable!(),
         };

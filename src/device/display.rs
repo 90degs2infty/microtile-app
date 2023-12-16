@@ -5,7 +5,7 @@ pub struct GridRenderer<'a>(&'a Grid);
 
 impl<'a> GridRenderer<'a> {
     pub fn new(grid: &'a Grid) -> Self {
-        Self { 0: grid }
+        Self(grid)
     }
 }
 
