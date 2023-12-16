@@ -1,14 +1,13 @@
 #![no_main]
 #![no_std]
-#![warn(clippy::all, clippy::pedantic)]
-// The following lints are allowed because
-// - clippy::module_name_repetitions - I struggle to come up with non-repetitive, meaningful names
-// - clippy::ignored_unit_patterns - to keep the `defmt` macros from triggering lints in my own code
-#![allow(clippy::module_name_repetitions, clippy::ignored_unit_patterns)]
 // The following lints are disabled (=`allow`ed) for the moment being. Turn them
 // active once you start documenting the public interface properly.
-#![allow(missing_docs, rustdoc::unescaped_backticks)]
-#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
+#![allow(
+    missing_docs,
+    rustdoc::missing_crate_level_docs,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc
+)]
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 use defmt_rtt as _; // global logger
