@@ -69,6 +69,11 @@ cargo = { level = "warn", priority = 2 }
 all = { level = "warn", priority = 3 }
 pedantic = { level = "warn", priority = 4 }
 absolute_paths = { level = "warn", priority = 2 }
+# The following lints are allowed because
+# - clippy::module_name_repetitions - I struggle to come up with non-repetitive, meaningful names
+# - clippy::ignored_unit_patterns - to keep the `defmt` macros from triggering lints in my own code
+module_name_repetitions = { level = "allow", priority = 5 }
+ignored_unit_patterns = { level = "allow", priority = 5 }
 
 [patch.crates-io]
 microbit-v2 = { git = "https://github.com/90degs2infty/microbit.git", branch = "feature_update-hal" }
