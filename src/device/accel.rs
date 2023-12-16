@@ -69,7 +69,6 @@ pub struct HorizontalMovementDriver<'a, 'b, T, S> {
 }
 
 impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Stopped> {
-    // TODO: add pin for interrupt?
     pub fn new<P>(
         irq: &'b GpioResources<'b>,
         mailbox: Sender<'a, Message, MAILBOX_CAPACITY>,
