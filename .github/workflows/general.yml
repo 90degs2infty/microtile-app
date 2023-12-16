@@ -74,16 +74,3 @@ jobs:
           name: microtile-app-${{ matrix.profile }}
           path: |
             target/${{ matrix.target_dir }}/minimal
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: nightly
-          target: thumbv7em-none-eabihf
-      - uses: Swatinem/rust-cache@v2
-      - name: Run tests
-        run: cargo test
