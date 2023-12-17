@@ -1,5 +1,7 @@
+use core::f32::consts::{FRAC_PI_2, PI};
 use core::fmt::Debug;
 use either::Either;
+use micromath::F32Ext;
 use microtile_engine::{
     gameplay::game::{Game, Observer, ProcessRows, TileFloating, TileNeeded},
     geometry::tile::BasicTile,
@@ -9,6 +11,17 @@ use rtic_sync::channel::{ReceiveError, Receiver};
 pub enum Message {
     TimerTick,
     BtnBPress,
+    AccelerometerData { x: i32, y: i32, z: i32 }, // TODO: no need to model y here
+}
+
+impl From<(i32, i32, i32)> for Message {
+    fn from(value: (i32, i32, i32)) -> Self {
+        Self::AccelerometerData {
+            x: value.0,
+            y: value.1,
+            z: value.2,
+        }
+    }
 }
 
 pub enum DriverError {
@@ -84,6 +97,20 @@ impl<'a, O> GameDriver<'a, O>
 where
     O: Observer + Debug,
 {
+    // Thresholds when measuring the angle from the vertical z-axis
+    const COLUMN_0_THRESHOLD_UNCOMP: f32 = -PI * 3.0 / 16.0;
+    const COLUMN_1_THRESHOLD_UNCOMP: f32 = -PI / 16.0;
+    const COLUMN_2_THRESHOLD_UNCOMP: f32 = -Self::COLUMN_1_THRESHOLD_UNCOMP;
+    const COLUMN_3_THRESHOLD_UNCOMP: f32 = -Self::COLUMN_0_THRESHOLD_UNCOMP;
+
+    // Thresholds when measuring the angle using the values coming from the
+    // accelerometer (that is from negative x-axis, or measured from the vertical
+    // z-axis with an offset of pi/2)
+    const COLUMN_0_THRESHOLD: f32 = Self::COLUMN_0_THRESHOLD_UNCOMP - FRAC_PI_2;
+    const COLUMN_1_THRESHOLD: f32 = Self::COLUMN_1_THRESHOLD_UNCOMP - FRAC_PI_2;
+    const COLUMN_2_THRESHOLD: f32 = Self::COLUMN_2_THRESHOLD_UNCOMP - FRAC_PI_2;
+    const COLUMN_3_THRESHOLD: f32 = Self::COLUMN_3_THRESHOLD_UNCOMP - FRAC_PI_2;
+
     /// Note: the contained peripherals start generating events right away, so be sure to
     /// set up the event handling as fast as possible
     pub fn new(mailbox: Receiver<'a, Message, MAILBOX_CAPACITY>, o: O) -> Self {
@@ -97,6 +124,42 @@ where
         Self {
             s: Some(State::TileFloating(game)),
             mailbox,
+        }
+    }
+
+    // TODO: this function probably goes into the accel module
+    #[must_use]
+    fn cap_sensor_value(x: i32) -> i16 {
+        // we're measuring in the range of [-2g, 2g] in units of milli-g
+        const MAX_SENSOR_VAL: i32 = 2000;
+        if x.abs() < MAX_SENSOR_VAL {
+            #[allow(clippy::cast_possible_truncation)]
+            {
+                x as i16
+            }
+        } else {
+            #[allow(clippy::cast_possible_truncation)]
+            {
+                (x.signum() * MAX_SENSOR_VAL) as i16
+            }
+        }
+    }
+
+    fn convert_accel_to_column(x: i32, z: i32) -> u8 {
+        let x: f32 = Self::cap_sensor_value(x).into();
+        let z: f32 = Self::cap_sensor_value(z).into();
+        let angle = z.atan2(x); // think + FRAC_PI_2, but this offset is
+                                //compensated in below thresholds
+        if angle < Self::COLUMN_0_THRESHOLD {
+            0
+        } else if angle < Self::COLUMN_1_THRESHOLD {
+            1
+        } else if angle < Self::COLUMN_2_THRESHOLD {
+            2
+        } else if angle < Self::COLUMN_3_THRESHOLD {
+            3
+        } else {
+            4
         }
     }
 
@@ -130,6 +193,10 @@ where
                     }
 
                     self.s = state.map(State::rotate);
+                }
+                Message::AccelerometerData { x, y: _, z } => {
+                    let column = Self::convert_accel_to_column(x, z);
+                    defmt::trace!("column: {}", column);
                 }
             }
         }

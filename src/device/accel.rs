@@ -211,11 +211,11 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Started> {
                 data.y_mg(),
                 data.z_mg()
             );
-            //self.command_pipe.try_send(Message::BtnBPress)
-            Ok(())
-        } else {
-            // event does not belong to our channel -> ignore it
-            Ok(())
+            self.command_pipe
+                .try_send(data.xyz_mg().into())
+                .map_err(<TrySendError<Message> as Into<AccelError<CommE, PinE>>>::into)?;
         }
+        // event does not belong to our channel -> ignore it
+        Ok(())
     }
 }
