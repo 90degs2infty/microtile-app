@@ -11,11 +11,11 @@ use rtic_sync::channel::{ReceiveError, Receiver};
 pub enum Message {
     TimerTick,
     BtnBPress,
-    AccelerometerData { x: i32, z: i32 },
+    AccelerometerData { x: i16, z: i16 },
 }
 
 impl Message {
-    pub fn acceleration(x: i32, z: i32) -> Self {
+    pub fn acceleration(x: i16, z: i16) -> Self {
         Self::AccelerometerData { x, z }
     }
 }
@@ -123,27 +123,9 @@ where
         }
     }
 
-    // TODO: this function probably goes into the accel module
-    #[must_use]
-    fn cap_sensor_value(x: i32) -> i16 {
-        // we're measuring in the range of [-2g, 2g] in units of milli-g
-        const MAX_SENSOR_VAL: i32 = 2000;
-        if x.abs() < MAX_SENSOR_VAL {
-            #[allow(clippy::cast_possible_truncation)]
-            {
-                x as i16
-            }
-        } else {
-            #[allow(clippy::cast_possible_truncation)]
-            {
-                (x.signum() * MAX_SENSOR_VAL) as i16
-            }
-        }
-    }
-
-    fn convert_accel_to_column(x: i32, z: i32) -> u8 {
-        let x: f32 = Self::cap_sensor_value(x).into();
-        let z: f32 = Self::cap_sensor_value(z).into();
+    fn convert_accel_to_column(x: i16, z: i16) -> u8 {
+        let x: f32 = x.into();
+        let z: f32 = z.into();
         let angle = z.atan2(x); // think + FRAC_PI_2, but this offset is
                                 //compensated in below thresholds
         if angle < Self::COLUMN_0_THRESHOLD {
