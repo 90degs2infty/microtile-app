@@ -8,6 +8,7 @@ use microtile_engine::{
 };
 use rtic_sync::channel::{ReceiveError, Receiver};
 
+#[must_use]
 pub enum Message {
     TimerTick,
     BtnBPress,
