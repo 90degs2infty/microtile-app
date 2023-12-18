@@ -1,5 +1,8 @@
-use core::f32::consts::{FRAC_PI_2, PI};
-use core::fmt::Debug;
+use core::{
+    f32::consts::{FRAC_PI_2, PI},
+    fmt::Debug,
+    ops::FnOnce,
+};
 use either::Either;
 use micromath::F32Ext;
 use microtile_engine::{
@@ -77,6 +80,8 @@ where
     }
 
     fn move_to(self, column: u8) -> Self {
+        defmt::trace!("column: {}", column);
+
         if let State::TileFloating(mut game) = self {
             let difference =
                 <u8 as Into<i32>>::into(column) - <u8 as Into<i32>>::into(game.tile_column());
@@ -165,6 +170,22 @@ where
         }
     }
 
+    fn map_state<F>(&mut self, f: F)
+    where
+        F: FnOnce(State<O>) -> State<O>,
+    {
+        // We apply
+        // [Jone's trick](https://matklad.github.io/2019/07/25/unsafe-as-a-type-system.html) in
+        // here to transparently promote a borrowed to an owned state without cloning. The borrowed
+        // state is taken from the borrowed &self.
+        let state = self.s.take();
+        if state.is_none() {
+            unreachable!("GameDriver should always be in a defined state");
+        }
+
+        self.s = state.map(f);
+    }
+
     pub async fn run(&mut self) -> Result<(), DriverError> {
         loop {
             let msg = self.mailbox.recv().await.map_err(|e| match e {
@@ -178,34 +199,14 @@ where
 
             match msg {
                 Message::TimerTick => {
-                    // We need to have the wrapped `Game` as owned value (as opposed to as borrowed value), because
-                    // `Game`'s API maps owned values to owned values.
-                    // But since `run`
-                    let state = self.s.take();
-                    if state.is_none() {
-                        unreachable!("GameDriver should always be in a defined state");
-                    }
-
-                    self.s = state.map(State::tick);
+                    self.map_state(State::tick);
                 }
                 Message::BtnBPress => {
-                    let state = self.s.take();
-                    if state.is_none() {
-                        unreachable!("GameDriver should always be in a defined state");
-                    }
-
-                    self.s = state.map(State::rotate);
+                    self.map_state(State::rotate);
                 }
                 Message::AccelerometerData { x, z } => {
                     let column = Self::convert_accel_to_column(x, z);
-                    defmt::trace!("column: {}", column);
-
-                    let state = self.s.take();
-                    if state.is_none() {
-                        unreachable!("GameDriver should always be in a defined state");
-                    }
-
-                    self.s = state.map(|s| s.move_to(column));
+                    self.map_state(|s| s.move_to(column));
                 }
             }
         }
