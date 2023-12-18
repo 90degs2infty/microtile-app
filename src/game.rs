@@ -90,10 +90,12 @@ where
                 if difference < 0 {
                     if game.move_tile_left().is_err() {
                         defmt::trace!("Ignoring invalid move to the left");
+                        break;
                     }
                 } else {
                     if game.move_tile_right().is_err() {
                         defmt::trace!("Ignoring invalid move to the right");
+                        break;
                     }
                 }
             }
