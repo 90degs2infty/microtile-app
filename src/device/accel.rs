@@ -1,4 +1,4 @@
-use crate::game::{Message, MAILBOX_CAPACITY};
+use crate::game::{driver::MAILBOX_CAPACITY, message::Message};
 use core::{fmt::Debug, marker::PhantomData};
 use lsm303agr::{
     interface::{I2cInterface, ReadData, WriteData},

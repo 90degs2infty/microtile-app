@@ -1,4 +1,4 @@
-use crate::game::{Message, MAILBOX_CAPACITY};
+use crate::game::{driver::MAILBOX_CAPACITY, message::Message};
 use core::{marker::PhantomData, ops::Not};
 use cortex_m::prelude::_embedded_hal_timer_CountDown;
 use microbit::{
