@@ -83,3 +83,7 @@ ignored_unit_patterns = { level = "allow", priority = 5 }
 
 [patch.crates-io]
 microbit-v2 = { git = "https://github.com/90degs2infty/microbit.git", branch = "feature_update-hal" }
+
+[[bin]]
+name = "microtile"
+path = "src/bin/microtile.rs"
