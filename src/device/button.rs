@@ -1,4 +1,4 @@
-use crate::game::{driver::MAILBOX_CAPACITY, Message};
+use crate::game::{driver::MAILBOX_CAPACITY, message::Message};
 use core::marker::PhantomData;
 use microbit::{
     gpio::BTN_B,

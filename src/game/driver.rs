@@ -1,4 +1,4 @@
-use super::{tile::TileProducer, Message};
+use super::{message::Message, tile::TileProducer};
 use core::{
     f32::consts::{FRAC_PI_2, PI},
     fmt::Debug,

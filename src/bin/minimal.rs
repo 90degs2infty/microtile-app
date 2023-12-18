@@ -45,8 +45,8 @@ mod app {
         },
         game::{
             driver::{GameDriver, MAILBOX_CAPACITY},
+            message::Message,
             tile::LoopingProducer,
-            Message,
         },
     };
     use microtile_engine::{gameplay::game::Observer, geometry::grid::Grid};
