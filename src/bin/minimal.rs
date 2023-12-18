@@ -43,7 +43,7 @@ mod app {
             errata::clear_int_i2c_interrupt_line,
             timer::{GameTickDriver, Started as TickStarted},
         },
-        game::{GameDriver, LoopingProducer, Message, MAILBOX_CAPACITY},
+        game::{tile::LoopingProducer, GameDriver, Message, MAILBOX_CAPACITY},
     };
     use microtile_engine::{gameplay::game::Observer, geometry::grid::Grid};
     use rtic_sync::channel::{Channel, TrySendError};
