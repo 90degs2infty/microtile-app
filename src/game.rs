@@ -24,32 +24,76 @@ impl Message {
     }
 }
 
+pub trait TileProducer {
+    fn generate_tile(&mut self) -> BasicTile;
+}
+
+pub struct TileIterator<P> {
+    producer: P,
+}
+
+impl<P> TileIterator<P> {
+    #[must_use]
+    pub fn new(producer: P) -> Self {
+        Self { producer }
+    }
+}
+
+impl<P> Iterator for TileIterator<P>
+where
+    P: TileProducer,
+{
+    type Item = BasicTile;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.producer.generate_tile())
+    }
+}
+
+pub struct ConstantProducer {
+    t: BasicTile,
+}
+
+impl ConstantProducer {
+    #[must_use]
+    pub fn new(t: BasicTile) -> Self {
+        Self { t }
+    }
+}
+
+impl TileProducer for ConstantProducer {
+    fn generate_tile(&mut self) -> BasicTile {
+        self.t.clone()
+    }
+}
+
 pub enum DriverError {
     SenderDropped,
 }
 
-enum State<O> {
-    TileNeeded(Game<TileNeeded, O>),
-    TileFloating(Game<TileFloating, O>),
-    ProcessRows(Game<ProcessRows, O>),
+enum State<O, P> {
+    TileNeeded(Game<TileNeeded, O>, P),
+    TileFloating(Game<TileFloating, O>, P),
+    ProcessRows(Game<ProcessRows, O>, P),
 }
 
-impl<O> State<O>
+impl<O, P> State<O, P>
 where
     O: Observer + Debug,
+    P: TileProducer,
 {
     fn tick(self) -> Self {
         match self {
-            State::TileFloating(game) => match game.descend_tile() {
-                Either::Left(game) => State::TileFloating(game),
-                Either::Right(game) => State::ProcessRows(game),
+            State::TileFloating(game, p) => match game.descend_tile() {
+                Either::Left(game) => State::TileFloating(game, p),
+                Either::Right(game) => State::ProcessRows(game, p),
             },
-            State::ProcessRows(game) => match game.process_row() {
-                Either::Left(game) => State::ProcessRows(game),
-                Either::Right(game) => State::TileNeeded(game),
+            State::ProcessRows(game, p) => match game.process_row() {
+                Either::Left(game) => State::ProcessRows(game, p),
+                Either::Right(game) => State::TileNeeded(game, p),
             },
-            State::TileNeeded(game) => match game.place_tile(BasicTile::Diagonal) {
-                Either::Left(game) => State::TileFloating(game),
+            State::TileNeeded(game, mut p) => match game.place_tile(p.generate_tile()) {
+                Either::Left(game) => State::TileFloating(game, p),
                 Either::Right(mut game) => {
                     defmt::info!("restarting game");
                     let o = game
@@ -61,18 +105,23 @@ where
                     let game = game
                         .place_tile(BasicTile::Diagonal)
                         .expect_left("first tile should not end game");
-                    State::TileFloating(game)
+                    State::TileFloating(game, p)
                 }
             },
         }
     }
+}
 
+impl<O, P> State<O, P>
+where
+    O: Observer + Debug,
+{
     fn rotate(self) -> Self {
-        if let State::TileFloating(mut game) = self {
+        if let State::TileFloating(mut game, p) = self {
             if game.rotate_tile().is_err() {
                 defmt::trace!("Ignoring invalid rotation");
             }
-            State::TileFloating(game)
+            State::TileFloating(game, p)
         } else {
             defmt::trace!("Ignoring rotation due to invalid state");
             self
@@ -82,7 +131,7 @@ where
     fn move_to(self, column: u8) -> Self {
         defmt::trace!("column: {}", column);
 
-        if let State::TileFloating(mut game) = self {
+        if let State::TileFloating(mut game, p) = self {
             let difference =
                 <u8 as Into<i32>>::into(column) - <u8 as Into<i32>>::into(game.tile_column());
 
@@ -100,7 +149,7 @@ where
                     }
                 }
             }
-            Self::TileFloating(game)
+            Self::TileFloating(game, p)
         } else {
             defmt::trace!("Ignoring horizontal movement due to invalid state");
             self
@@ -108,10 +157,10 @@ where
     }
 }
 
-pub struct GameDriver<'a, O> {
+pub struct GameDriver<'a, O, P> {
     // `None` value is used to implement [Jone's trick](https://matklad.github.io/2019/07/25/unsafe-as-a-type-system.html),
     // any user-facing `None` is considered a bug. I.e. the user may assume to always interact with a `Some(...)`.
-    s: Option<State<O>>,
+    s: Option<State<O, P>>,
     mailbox: Receiver<'a, Message, MAILBOX_CAPACITY>,
 }
 
@@ -121,7 +170,7 @@ pub struct GameDriver<'a, O> {
 /// the capacity is defined as free constant.
 pub const MAILBOX_CAPACITY: usize = 4;
 
-impl<'a, O> GameDriver<'a, O>
+impl<'a, O, P> GameDriver<'a, O, P>
 where
     O: Observer + Debug,
 {
@@ -141,7 +190,7 @@ where
 
     /// Note: the contained peripherals start generating events right away, so be sure to
     /// set up the event handling as fast as possible
-    pub fn new(mailbox: Receiver<'a, Message, MAILBOX_CAPACITY>, o: O) -> Self {
+    pub fn new(mailbox: Receiver<'a, Message, MAILBOX_CAPACITY>, o: O, producer: P) -> Self {
         // initialize the game
         let mut game = Game::default()
             .place_tile(BasicTile::Diagonal)
@@ -150,7 +199,7 @@ where
             .expect("newly initialized game should not have observer set");
 
         Self {
-            s: Some(State::TileFloating(game)),
+            s: Some(State::TileFloating(game, producer)),
             mailbox,
         }
     }
@@ -175,7 +224,7 @@ where
 
     fn map_state<F>(&mut self, f: F)
     where
-        F: FnOnce(State<O>) -> State<O>,
+        F: FnOnce(State<O, P>) -> State<O, P>,
     {
         // We apply
         // [Jone's trick](https://matklad.github.io/2019/07/25/unsafe-as-a-type-system.html) in
@@ -188,7 +237,13 @@ where
 
         self.s = state.map(f);
     }
+}
 
+impl<'a, O, P> GameDriver<'a, O, P>
+where
+    O: Observer + Debug,
+    P: TileProducer,
+{
     pub async fn run(&mut self) -> Result<(), DriverError> {
         loop {
             let msg = self.mailbox.recv().await.map_err(|e| match e {

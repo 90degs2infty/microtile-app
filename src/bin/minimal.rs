@@ -43,9 +43,12 @@ mod app {
             errata::clear_int_i2c_interrupt_line,
             timer::{GameTickDriver, Started as TickStarted},
         },
-        game::{GameDriver, Message, MAILBOX_CAPACITY},
+        game::{ConstantProducer, GameDriver, Message, MAILBOX_CAPACITY},
     };
-    use microtile_engine::{gameplay::game::Observer, geometry::grid::Grid};
+    use microtile_engine::{
+        gameplay::game::Observer,
+        geometry::{grid::Grid, tile::BasicTile},
+    };
     use rtic_sync::channel::{Channel, TrySendError};
 
     const HIGH_LEVEL_DISPLAY_FREQ: u32 = 5;
@@ -78,7 +81,7 @@ mod app {
     #[local]
     struct Local {
         highlevel_display_driver: Timer<HighLevelDisplayDriver, Periodic>,
-        game_driver: &'static mut GameDriver<'static, GameObserver>,
+        game_driver: &'static mut GameDriver<'static, GameObserver, ConstantProducer>,
         timer_handler: &'static mut GameTickDriver<'static, TimerGameDriver, TickStarted>,
         rotation_handler: &'static mut RotationDriver<'static, 'static, RotationStarted>,
         horizontal_handler: &'static mut HorizontalMovementDriver<
@@ -91,7 +94,7 @@ mod app {
 
     #[init(local = [
         game_driver_channel: Channel<Message, MAILBOX_CAPACITY> = Channel::new(),
-        game_driver_mem: MaybeUninit<GameDriver<'static, GameObserver>> = MaybeUninit::uninit(),
+        game_driver_mem: MaybeUninit<GameDriver<'static, GameObserver, ConstantProducer>> = MaybeUninit::uninit(),
         timer_handler_mem: MaybeUninit<GameTickDriver<'static, TimerGameDriver, TickStarted>> = MaybeUninit::uninit(),
         gpiote_mem: MaybeUninit<Gpiote> = MaybeUninit::uninit(),
         rotation_resources_mem: MaybeUninit<GpioResources<'static>> = MaybeUninit::uninit(),
@@ -128,9 +131,11 @@ mod app {
         );
         let horizontal_handler = unsafe { cx.local.horizontal_handler_mem.assume_init_mut() };
 
-        cx.local
-            .game_driver_mem
-            .write(GameDriver::new(receiver, observer));
+        cx.local.game_driver_mem.write(GameDriver::new(
+            receiver,
+            observer,
+            ConstantProducer::new(BasicTile::Diagonal),
+        ));
         let game_driver = unsafe { cx.local.game_driver_mem.assume_init_mut() };
 
         cx.local.timer_handler_mem.write(
