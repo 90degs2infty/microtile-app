@@ -1,14 +1,24 @@
+use core::f32::consts::{FRAC_PI_2, PI};
 use core::fmt::Debug;
 use either::Either;
+use micromath::F32Ext;
 use microtile_engine::{
     gameplay::game::{Game, Observer, ProcessRows, TileFloating, TileNeeded},
     geometry::tile::BasicTile,
 };
 use rtic_sync::channel::{ReceiveError, Receiver};
 
+#[must_use]
 pub enum Message {
     TimerTick,
     BtnBPress,
+    AccelerometerData { x: i16, z: i16 },
+}
+
+impl Message {
+    pub fn acceleration(x: i16, z: i16) -> Self {
+        Self::AccelerometerData { x, z }
+    }
 }
 
 pub enum DriverError {
@@ -84,6 +94,20 @@ impl<'a, O> GameDriver<'a, O>
 where
     O: Observer + Debug,
 {
+    // Thresholds when measuring the angle from the vertical z-axis
+    const COLUMN_0_THRESHOLD_UNCOMP: f32 = -PI * 3.0 / 16.0;
+    const COLUMN_1_THRESHOLD_UNCOMP: f32 = -PI / 16.0;
+    const COLUMN_2_THRESHOLD_UNCOMP: f32 = -Self::COLUMN_1_THRESHOLD_UNCOMP;
+    const COLUMN_3_THRESHOLD_UNCOMP: f32 = -Self::COLUMN_0_THRESHOLD_UNCOMP;
+
+    // Thresholds when measuring the angle using the values coming from the
+    // accelerometer (that is from negative x-axis, or measured from the vertical
+    // z-axis with an offset of pi/2)
+    const COLUMN_0_THRESHOLD: f32 = Self::COLUMN_0_THRESHOLD_UNCOMP - FRAC_PI_2;
+    const COLUMN_1_THRESHOLD: f32 = Self::COLUMN_1_THRESHOLD_UNCOMP - FRAC_PI_2;
+    const COLUMN_2_THRESHOLD: f32 = Self::COLUMN_2_THRESHOLD_UNCOMP - FRAC_PI_2;
+    const COLUMN_3_THRESHOLD: f32 = Self::COLUMN_3_THRESHOLD_UNCOMP - FRAC_PI_2;
+
     /// Note: the contained peripherals start generating events right away, so be sure to
     /// set up the event handling as fast as possible
     pub fn new(mailbox: Receiver<'a, Message, MAILBOX_CAPACITY>, o: O) -> Self {
@@ -97,6 +121,24 @@ where
         Self {
             s: Some(State::TileFloating(game)),
             mailbox,
+        }
+    }
+
+    fn convert_accel_to_column(x: i16, z: i16) -> u8 {
+        let x: f32 = x.into();
+        let z: f32 = z.into();
+        let angle = z.atan2(x); // think + FRAC_PI_2, but this offset is
+                                //compensated in below thresholds
+        if angle < Self::COLUMN_0_THRESHOLD {
+            0
+        } else if angle < Self::COLUMN_1_THRESHOLD {
+            1
+        } else if angle < Self::COLUMN_2_THRESHOLD {
+            2
+        } else if angle < Self::COLUMN_3_THRESHOLD {
+            3
+        } else {
+            4
         }
     }
 
@@ -130,6 +172,10 @@ where
                     }
 
                     self.s = state.map(State::rotate);
+                }
+                Message::AccelerometerData { x, z } => {
+                    let column = Self::convert_accel_to_column(x, z);
+                    defmt::trace!("column: {}", column);
                 }
             }
         }

@@ -185,6 +185,23 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Started> {
         }
     }
 
+    #[must_use]
+    fn cap_sensor_value(value: i32) -> i16 {
+        // we're measuring in the range of [-2g, 2g] in units of milli-g
+        const MAX_SENSOR_VAL: i32 = 2000;
+        if value.abs() < MAX_SENSOR_VAL {
+            #[allow(clippy::cast_possible_truncation)]
+            {
+                value as i16
+            }
+        } else {
+            #[allow(clippy::cast_possible_truncation)]
+            {
+                (value.signum() * MAX_SENSOR_VAL) as i16
+            }
+        }
+    }
+
     pub fn handle_accel_event<CommE, PinE>(&mut self) -> Result<(), AccelError<CommE, PinE>>
     where
         I2cInterface<Twim<T>>:
@@ -201,21 +218,20 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Started> {
         // https://infocenter.nordicsemi.com/topic/ps_nrf52833/gpiote.html?cp=5_1_0_5_8
         if self.i2c_irq.channel.is_event_triggered() {
             self.i2c_irq.channel.reset_events();
-            let data = self
+            let (x, y, z) = self
                 .accel
                 .acceleration()
-                .map_err(<Error<CommE, PinE> as Into<AccelError<CommE, PinE>>>::into)?;
-            defmt::trace!(
-                "Acceleration: {} {} {}",
-                data.x_mg(),
-                data.y_mg(),
-                data.z_mg()
-            );
-            //self.command_pipe.try_send(Message::BtnBPress)
-            Ok(())
-        } else {
-            // event does not belong to our channel -> ignore it
-            Ok(())
+                .map_err(<Error<CommE, PinE> as Into<AccelError<CommE, PinE>>>::into)?
+                .xyz_mg();
+            defmt::trace!("Acceleration: {} {} {}", x, y, z,);
+            self.command_pipe
+                .try_send(Message::acceleration(
+                    Self::cap_sensor_value(x),
+                    Self::cap_sensor_value(z),
+                ))
+                .map_err(<TrySendError<Message> as Into<AccelError<CommE, PinE>>>::into)?;
         }
+        // event does not belong to our channel -> ignore it
+        Ok(())
     }
 }
