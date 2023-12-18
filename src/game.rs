@@ -75,6 +75,29 @@ where
             self
         }
     }
+
+    fn move_to(self, column: u8) -> Self {
+        if let State::TileFloating(mut game) = self {
+            let difference =
+                <u8 as Into<i32>>::into(column) - <u8 as Into<i32>>::into(game.tile_column());
+
+            for _ in 1..=difference.abs() {
+                if difference < 0 {
+                    if game.move_tile_left().is_err() {
+                        defmt::trace!("Ignoring invalid move to the left");
+                    }
+                } else {
+                    if game.move_tile_right().is_err() {
+                        defmt::trace!("Ignoring invalid move to the right");
+                    }
+                }
+            }
+            Self::TileFloating(game)
+        } else {
+            defmt::trace!("Ignoring horizontal movement due to invalid state");
+            self
+        }
+    }
 }
 
 pub struct GameDriver<'a, O> {
@@ -176,6 +199,13 @@ where
                 Message::AccelerometerData { x, z } => {
                     let column = Self::convert_accel_to_column(x, z);
                     defmt::trace!("column: {}", column);
+
+                    let state = self.s.take();
+                    if state.is_none() {
+                        unreachable!("GameDriver should always be in a defined state");
+                    }
+
+                    self.s = state.map(|s| s.move_to(column));
                 }
             }
         }
