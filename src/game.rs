@@ -93,6 +93,7 @@ where
                         break;
                     }
                 } else {
+                    #[allow(clippy::collapsible_else_if)] // keeping this for matching source layout
                     if game.move_tile_right().is_err() {
                         defmt::trace!("Ignoring invalid move to the right");
                         break;
