@@ -201,18 +201,14 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Started> {
         // https://infocenter.nordicsemi.com/topic/ps_nrf52833/gpiote.html?cp=5_1_0_5_8
         if self.i2c_irq.channel.is_event_triggered() {
             self.i2c_irq.channel.reset_events();
-            let data = self
+            let (x, y, z) = self
                 .accel
                 .acceleration()
-                .map_err(<Error<CommE, PinE> as Into<AccelError<CommE, PinE>>>::into)?;
-            defmt::trace!(
-                "Acceleration: {} {} {}",
-                data.x_mg(),
-                data.y_mg(),
-                data.z_mg()
-            );
+                .map_err(<Error<CommE, PinE> as Into<AccelError<CommE, PinE>>>::into)?
+                .xyz_mg();
+            defmt::trace!("Acceleration: {} {} {}", x, y, z,);
             self.command_pipe
-                .try_send(data.xyz_mg().into())
+                .try_send(Message::acceleration(x, z))
                 .map_err(<TrySendError<Message> as Into<AccelError<CommE, PinE>>>::into)?;
         }
         // event does not belong to our channel -> ignore it

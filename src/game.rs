@@ -11,16 +11,12 @@ use rtic_sync::channel::{ReceiveError, Receiver};
 pub enum Message {
     TimerTick,
     BtnBPress,
-    AccelerometerData { x: i32, y: i32, z: i32 }, // TODO: no need to model y here
+    AccelerometerData { x: i32, z: i32 },
 }
 
-impl From<(i32, i32, i32)> for Message {
-    fn from(value: (i32, i32, i32)) -> Self {
-        Self::AccelerometerData {
-            x: value.0,
-            y: value.1,
-            z: value.2,
-        }
+impl Message {
+    pub fn acceleration(x: i32, z: i32) -> Self {
+        Self::AccelerometerData { x, z }
     }
 }
 
@@ -194,7 +190,7 @@ where
 
                     self.s = state.map(State::rotate);
                 }
-                Message::AccelerometerData { x, y: _, z } => {
+                Message::AccelerometerData { x, z } => {
                     let column = Self::convert_accel_to_column(x, z);
                     defmt::trace!("column: {}", column);
                 }
