@@ -40,3 +40,4 @@ pub fn exit() -> ! {
 
 pub mod device;
 pub mod game;
+pub mod util;

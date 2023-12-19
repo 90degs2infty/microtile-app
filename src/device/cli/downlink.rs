@@ -1,11 +1,11 @@
+use crate::util::nb_async;
+
 use super::command::Command;
-use futures::{future::poll_fn, task::Poll};
 use heapless::Vec;
 use microbit::hal::{
     prelude::_embedded_hal_serial_Read,
     uarte::{Instance, UarteRx},
 };
-use nb::Error;
 use rtic_sync::channel::Sender;
 
 pub const MAILBOX_CAPACITY: usize = 16;
@@ -25,6 +25,7 @@ impl<T> DownlinkDriver<T>
 where
     T: Instance,
 {
+    #[must_use]
     pub fn new(rx: UarteRx<T>, mailbox: Sender<'static, Command, MAILBOX_CAPACITY>) -> Self {
         Self {
             rx,
@@ -35,17 +36,20 @@ where
 
     pub async fn run(&mut self) {
         loop {
-            let val = poll_fn(|_| {
-                self.rx.read().map_or_else(
-                    |e| match e {
-                        Error::WouldBlock => Poll::Pending,
-                        Error::Other(e) => Poll::Ready(Err(e)),
-                    },
-                    |val| Poll::Ready(Ok(val)),
-                )
-            })
-            .await;
+            if let Ok(byte) = nb_async(|| self.rx.read()).await {
+                if byte == b';' {
+                    if let Ok(cmd) = Command::try_from(self.buffer_in.as_slice()) {
+                        self.command_pipe
+                            .send(cmd)
+                            .await
+                            .expect("Receiver of commandline commands got dropped!");
+                    }
+                } else if self.buffer_in.is_full() {
+                    self.buffer_in.clear();
+                }
+                // Safety: we've just made sure the buffer is not full
+                unsafe { self.buffer_in.push_unchecked(byte) };
+            };
         }
-        todo!()
     }
 }
