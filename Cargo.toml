@@ -90,3 +90,6 @@ microbit-v2 = { git = "https://github.com/90degs2infty/microbit.git", branch = "
 [[bin]]
 name = "microtile"
 path = "src/bin/microtile.rs"
+
+[build-dependencies]
+vergen = { version = "8.2.6", features = ["git", "gitcl"] }
