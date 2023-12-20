@@ -46,7 +46,7 @@ impl CommandReceiver {
 
     async fn execute_help(&mut self) -> Result<(), DriverError> {
         let help_text = StringIter::<'_, 32>::from(
-            "\r\n\
+            &"\r\n\
             === microtile ===\r\n\
             \r\n\
             available commands:\r\n\

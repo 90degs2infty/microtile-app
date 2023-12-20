@@ -23,10 +23,13 @@ pub struct StringIter<'a, const N: usize> {
     cursor: usize,
 }
 
-impl<'a, const N: usize> From<&'a str> for StringIter<'a, N> {
-    fn from(value: &'a str) -> Self {
+impl<'a, const N: usize, P> From<&'a P> for StringIter<'a, N>
+where
+    P: AsRef<str>,
+{
+    fn from(value: &'a P) -> Self {
         Self {
-            raw: value,
+            raw: value.as_ref(),
             cursor: 0,
         }
     }
