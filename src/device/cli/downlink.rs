@@ -12,6 +12,10 @@ pub const MAILBOX_CAPACITY: usize = 16;
 
 const IN_BUFFER_SIZE: usize = 8;
 
+pub enum DriverError {
+    ReceiverDropped,
+}
+
 pub struct DownlinkDriver<T>
 where
     T: Instance,
@@ -34,7 +38,7 @@ where
         }
     }
 
-    pub async fn run(&mut self) {
+    pub async fn run(&mut self) -> Result<(), DriverError> {
         loop {
             if let Ok(byte) = nb_async(|| self.rx.read()).await {
                 if byte == b';' {
@@ -42,7 +46,7 @@ where
                         self.command_pipe
                             .send(cmd)
                             .await
-                            .expect("Receiver of commandline commands got dropped!");
+                            .map_err(|_| DriverError::ReceiverDropped)?;
                     }
                 } else if self.buffer_in.is_full() {
                     self.buffer_in.clear();
