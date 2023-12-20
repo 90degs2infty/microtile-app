@@ -4,6 +4,8 @@ use super::{
     uplink::{Message, MAILBOX_CAPACITY as OUT_CAPACITY},
 };
 use crate::util::StringIter;
+use core::fmt::Write;
+use heapless::String;
 use rtic_sync::channel::{Receiver, Sender};
 
 pub enum DriverError {
@@ -40,7 +42,7 @@ impl CommandReceiver {
     async fn execute(&mut self, cmd: Command) -> Result<(), DriverError> {
         match cmd {
             Command::Help => self.execute_help().await,
-            Command::Version => todo!(),
+            Command::Version => self.execute_version().await,
         }
     }
 
@@ -61,6 +63,31 @@ impl CommandReceiver {
         );
 
         for msg in help_text {
+            match msg {
+                Ok(msg) => self
+                    .outgoing
+                    .send(msg)
+                    .await
+                    .map_err(|_| DriverError::UplinkReceiverDropped)?,
+                Err(_) => unreachable!("Hardcoded string should be convertible"),
+            }
+        }
+        Ok(())
+    }
+
+    async fn execute_version(&mut self) -> Result<(), DriverError> {
+        let mut formatted = String::<128>::new();
+        write!(
+            &mut formatted,
+            "\r\n\
+            This microtile build is based on '{}'.\r\n",
+            env!("VERGEN_GIT_DESCRIBE")
+        )
+        .map_err(|_| DriverError::Encoding)?;
+
+        let version_text = StringIter::<'_, 32>::from(&formatted);
+
+        for msg in version_text {
             match msg {
                 Ok(msg) => self
                     .outgoing
