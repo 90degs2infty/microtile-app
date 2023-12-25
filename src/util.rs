@@ -31,10 +31,10 @@ where
         mut self: core::pin::Pin<&mut Self>,
         cx: &mut core::task::Context<'_>,
     ) -> Poll<Self::Output> {
-        (&mut self.f)().map_or_else(
+        (self.f)().map_or_else(
             |e| match e {
                 Error::WouldBlock => {
-                    cx.waker().clone().wake();
+                    cx.waker().wake_by_ref();
                     Poll::Pending
                 }
                 Error::Other(e) => Poll::Ready(Err(e)),
