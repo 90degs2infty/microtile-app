@@ -1,14 +1,12 @@
-use microbit::hal::uarte::{Baudrate, Error, Instance, Parity, Pins, Uarte};
-use rtic_sync::channel::Channel;
-use uplink::{Message, MAILBOX_CAPACITY as UPLINK_CAPACITY};
-
+use self::command::Command;
 use crate::device::cli::{
     downlink::{DownlinkDriver, MAILBOX_CAPACITY as DOWNLINK_CAPACITY},
     receiver::CommandReceiver,
     uplink::UplinkDriver,
 };
-
-use self::command::Command;
+use microbit::hal::uarte::{Baudrate, Error, Instance, Parity, Pins, Uarte};
+use rtic_sync::channel::Channel;
+use uplink::{Message, MAILBOX_CAPACITY as UPLINK_CAPACITY};
 
 pub mod command;
 pub mod downlink;
