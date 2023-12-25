@@ -54,7 +54,7 @@ impl CommandReceiver {
             \r\n\
             available commands:\r\n\
             - help - prints this help message\r\n\
-            - version - prints VCS information\r\n\
+            - ver - prints VCS information\r\n\
             \r\n\
             syntax:\r\n\
             $ <cmd>;
