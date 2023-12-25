@@ -21,6 +21,7 @@ impl<F> Unpin for BusyWait<F> {}
 // value, we wake the owning task directly again.
 // Note that while this works for RTIC's executor, it may well lead to
 // starvation of other tasks when executed on other executors.
+// Even with RITC, this implementation relies on undocumented behaviour!
 impl<F, T, E> Future for BusyWait<F>
 where
     F: FnMut() -> NbResult<T, E>,
