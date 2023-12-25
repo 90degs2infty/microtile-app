@@ -132,7 +132,7 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Stopped> {
             .expect("Failed to enable accel interrupt");
 
         self.accel
-            .set_accel_mode_and_odr(delay, AccelMode::Normal, AccelOutputDataRate::Hz25)
+            .set_accel_mode_and_odr(delay, AccelMode::Normal, AccelOutputDataRate::Hz1)
             .expect("Failed to set accelerometer mode and odr");
 
         HorizontalMovementDriver {

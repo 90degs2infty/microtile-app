@@ -8,6 +8,7 @@ use core::fmt::Write;
 use heapless::String;
 use rtic_sync::channel::{Receiver, Sender};
 
+#[derive(Debug)]
 pub enum DriverError {
     DownlinkSenderDropped,
     UplinkReceiverDropped,

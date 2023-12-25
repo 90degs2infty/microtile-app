@@ -12,6 +12,7 @@ pub const MAILBOX_CAPACITY: usize = 16;
 
 const IN_BUFFER_SIZE: usize = 8;
 
+#[derive(Debug)]
 pub enum DriverError {
     ReceiverDropped,
 }
@@ -40,7 +41,13 @@ where
 
     pub async fn run(&mut self) -> Result<(), DriverError> {
         loop {
-            if let Ok(byte) = nb_async(|| self.rx.read()).await {
+            if let Ok(byte) = nb_async(|| {
+                defmt::trace!("Reading downlink");
+                self.rx.read()
+            })
+            .await
+            {
+                defmt::warn!("{}", byte);
                 if byte == b';' {
                     if let Ok(cmd) = Command::try_from(self.buffer_in.as_slice()) {
                         self.command_pipe

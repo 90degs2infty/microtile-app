@@ -25,10 +25,12 @@ mod app {
             gpiote::Gpiote,
             prelude::_embedded_hal_timer_CountDown,
             timer::{Instance, Periodic, Timer},
+            uarte::Pins,
         },
         pac::{
             self as microbit_pac, NVIC, TIMER0 as LowLevelDisplayDriver,
             TIMER1 as HighLevelDisplayDriver, TIMER2 as TimerGameDriver, TWIM0 as HorizontalDriver,
+            UARTE0 as CliDriver,
         },
         Board,
     };
@@ -39,6 +41,10 @@ mod app {
                 Started as HorizontalStarted,
             },
             button::{GpioResources, RotationDriver, Started as RotationStarted},
+            cli::{
+                downlink::DownlinkDriver, init as init_cli, receiver::CommandReceiver,
+                uplink::UplinkDriver, Resources as CliResources,
+            },
             display::GridRenderer,
             errata::clear_int_i2c_interrupt_line,
             timer::{GameTickDriver, Started as TickStarted},
@@ -91,6 +97,9 @@ mod app {
             HorizontalDriver,
             HorizontalStarted,
         >,
+        downlink_driver: &'static mut DownlinkDriver<CliDriver>,
+        uplink_driver: &'static mut UplinkDriver<CliDriver>,
+        command_driver: &'static mut CommandReceiver,
     }
 
     #[init(local = [
@@ -101,7 +110,11 @@ mod app {
         rotation_resources_mem: MaybeUninit<GpioResources<'static>> = MaybeUninit::uninit(),
         rotation_handler_mem: MaybeUninit<RotationDriver<'static, 'static, RotationStarted>> = MaybeUninit::uninit(),
         horizontal_resources_mem: MaybeUninit<HorizontalIrqResources<'static>> = MaybeUninit::uninit(),
-        horizontal_handler_mem: MaybeUninit<HorizontalMovementDriver<'static, 'static, HorizontalDriver, HorizontalStarted>> = MaybeUninit::uninit()
+        horizontal_handler_mem: MaybeUninit<HorizontalMovementDriver<'static, 'static, HorizontalDriver, HorizontalStarted>> = MaybeUninit::uninit(),
+        cli_resources_mem: MaybeUninit<CliResources> = MaybeUninit::uninit(),
+        uplink_driver_mem: MaybeUninit<UplinkDriver<CliDriver>> = MaybeUninit::uninit(),
+        downlink_driver_mem: MaybeUninit<DownlinkDriver<CliDriver>> = MaybeUninit::uninit(),
+        command_receiver_mem: MaybeUninit<CommandReceiver> = MaybeUninit::uninit(),
     ])]
     fn init(cx: init::Context) -> (Shared, Local) {
         defmt::info!("init");
@@ -111,6 +124,19 @@ mod app {
         let mut delay = Timer::new(board.TIMER2);
         let (twim0, pins) =
             clear_int_i2c_interrupt_line(board.TWIM0, board.i2c_internal, &mut delay);
+
+        // Setup commandline interface
+        let cli_resources = cx.local.cli_resources_mem.write(CliResources::default());
+        let (uplink, downlink, command_recv) =
+            init_cli(board.UARTE0, Pins::from(board.uart), cli_resources)
+                .expect("Could not initialize CLI drivers");
+        let uplink = cx.local.uplink_driver_mem.write(uplink);
+        let downlink = cx.local.downlink_driver_mem.write(downlink);
+        let command_recv = cx.local.command_receiver_mem.write(command_recv);
+
+        drive_cli_downlink::spawn().expect("Failed to spawn downlink driver task");
+        drive_cli_uplink::spawn().expect("Failed to spawn uplink driver task");
+        drive_command_processing::spawn().expect("Failed to spawn command processing taks");
 
         let observer = GameObserver {};
 
@@ -182,6 +208,9 @@ mod app {
                 timer_handler,
                 rotation_handler,
                 horizontal_handler,
+                downlink_driver: downlink,
+                uplink_driver: uplink,
+                command_driver: command_recv,
             },
         )
     }
@@ -226,6 +255,36 @@ mod app {
         cx.shared.display.lock(|display| {
             display.handle_display_event();
         });
+    }
+
+    #[task(priority = 1, local = [ downlink_driver ])]
+    async fn drive_cli_downlink(cx: drive_cli_downlink::Context) {
+        defmt::trace!("driving the serial interface's downlink now");
+        cx.local
+            .downlink_driver
+            .run()
+            .await
+            .expect("Error while driving the downlink");
+    }
+
+    #[task(priority = 1, local = [ uplink_driver ])]
+    async fn drive_cli_uplink(cx: drive_cli_uplink::Context) {
+        defmt::trace!("driving the serial interface's uplink now");
+        cx.local
+            .uplink_driver
+            .run()
+            .await
+            .expect("Error while driving the uplink");
+    }
+
+    #[task(priority = 1, local = [ command_driver ])]
+    async fn drive_command_processing(cx: drive_command_processing::Context) {
+        defmt::trace!("processing cli commands now");
+        cx.local
+            .command_driver
+            .run()
+            .await
+            .expect("Error while processing cli commands");
     }
 
     #[task(priority = 1, local = [ game_driver ])]
