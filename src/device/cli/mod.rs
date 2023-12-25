@@ -31,58 +31,6 @@ impl Default for Resources {
     }
 }
 
-/*
-pub struct CliResources<'a> {
-    tx_buf: &'a mut [u8; 255],
-    rx_buf: &'a mut [u8; 1],
-}
-
-impl<'a> CliResources<'a> {
-    pub fn new(tx_buf: &'a mut [u8; 255], rx_buf: &'a mut [u8; 1]) -> Self {
-        Self { tx_buf, rx_buf }
-    }
-}
-
-pub struct Channels<'a> {
-    str: &'a mut Channel<Message, UPLINK_CAPACITY>,
-    cmd: &'a mut Channel<Command, DOWNLINK_CAPACITY>,
-}
-
-impl<'a> Channels<'a> {
-    pub fn new(
-        str: &'a mut Channel<Message, UPLINK_CAPACITY>,
-        cmd: &'a mut Channel<Command, DOWNLINK_CAPACITY>,
-    ) -> Self {
-        Self { str, cmd }
-    }
-}
-
-pub struct Storage<'a, T>
-where
-    T: Instance,
-{
-    uplink: &'a mut MaybeUninit<UplinkDriver<T>>,
-    downlink: &'a mut MaybeUninit<DownlinkDriver<T>>,
-    command_recv: &'a mut MaybeUninit<CommandReceiver>,
-}
-
-impl<'a, T> Storage<'a, T>
-where
-    T: Instance,
-{
-    pub fn new(
-        uplink: &'a mut MaybeUninit<UplinkDriver<T>>,
-        downlink: &'a mut MaybeUninit<DownlinkDriver<T>>,
-        command_recv: &'a mut MaybeUninit<CommandReceiver>,
-    ) -> Self {
-        Self {
-            uplink,
-            downlink,
-            command_recv,
-        }
-    }
-} */
-
 pub fn init<T>(
     uarte: T,
     pins: Pins,
