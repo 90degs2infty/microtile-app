@@ -1,14 +1,14 @@
-use core::{cmp::min, pin::Pin, str::FromStr};
-use futures::{future::poll_fn, task::Poll, Future};
+use core::{cmp::min, str::FromStr};
+use futures::{task::Poll, Future};
 use heapless::String;
 use nb::{Error, Result as NbResult};
 
-pub struct BusyWait<F> {
+struct BusyWait<F> {
     f: F,
 }
 
 impl<F> BusyWait<F> {
-    pub fn new(f: F) -> Self {
+    fn new(f: F) -> Self {
         Self { f }
     }
 }
