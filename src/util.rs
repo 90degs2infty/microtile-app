@@ -16,6 +16,11 @@ impl<F> BusyWait<F> {
 // TODO: am I allowed to implement Unpin?!
 impl<F> Unpin for BusyWait<F> {}
 
+// `BusyWait`'s implementation of Future works by busy waiting for the result to
+// become ready. I.e. in the poll method, when obtaining a `Error::WouldBlock`
+// value, we wake the owning task directly again.
+// Note that while this works for RTIC's executor, it may well lead to
+// starvation of other tasks when executed on other executors.
 impl<F, T, E> Future for BusyWait<F>
 where
     F: FnMut() -> NbResult<T, E>,
