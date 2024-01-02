@@ -42,12 +42,9 @@ where
                 .await
                 .map_err(|_| DriverError::SenderDropped)?;
             write!(self.tx, "{msg}").map_err(|_| DriverError::FormatError)?;
-            nb_async(|| {
-                defmt::trace!("Flushing uplink");
-                self.tx.flush()
-            })
-            .await
-            .map_err(DriverError::UarteError)?;
+            nb_async(|| self.tx.flush())
+                .await
+                .map_err(DriverError::UarteError)?;
         }
     }
 }
