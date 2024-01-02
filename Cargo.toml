@@ -24,6 +24,9 @@ rtic-sync = "1.0.2"
 either = { version = "1.9.0", default_features = false }
 lsm303agr = "0.3.0"
 micromath = "2.1.0"
+heapless = "0.8.0"
+futures = { version = "0.3.29", default_features = false }
+nb = "1.1.0"
 
 # cargo build/run
 [profile.dev]
@@ -87,3 +90,6 @@ microbit-v2 = { git = "https://github.com/90degs2infty/microbit.git", branch = "
 [[bin]]
 name = "microtile"
 path = "src/bin/microtile.rs"
+
+[build-dependencies]
+vergen = { version = "8.2.6", features = ["git", "gitcl"] }
