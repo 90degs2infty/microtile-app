@@ -36,6 +36,9 @@ impl CommandReceiver {
                 .recv()
                 .await
                 .map_err(|_| DriverError::DownlinkSenderDropped)?;
+
+            defmt::trace!("Received command, processing it now.");
+
             self.execute(cmd).await?;
         }
     }

@@ -164,7 +164,10 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Started> {
         PinE: Debug,
         D: DelayUs<u32>,
     {
-        defmt::warn!("Stopping the horizontal movement driver is currently untested. The accelerometer is prone to blocking.");
+        defmt::warn!(
+            "Stopping the HorizontalMovementDriver is currently untested. \
+            The accelerometer is prone to blocking."
+        );
 
         self.irq_event.disable_interrupt();
 
@@ -209,8 +212,6 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Started> {
         CommE: Debug,
         PinE: Debug,
     {
-        defmt::trace!("handle_accel_event()");
-
         // We have to check the channel for having a pending event, because of the way
         // the Gpiote peripheral works: there is a single Gpiote IRQ which gets pended
         // if there is an event _on any_ of the available channels.
@@ -223,7 +224,7 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Started> {
                 .acceleration()
                 .map_err(<Error<CommE, PinE> as Into<AccelError<CommE, PinE>>>::into)?
                 .xyz_mg();
-            defmt::trace!("Acceleration: {} {} {}", x, y, z,);
+            defmt::debug!("Obtained acceleration: {} {} {}", x, y, z,);
             self.command_pipe
                 .try_send(Message::acceleration(
                     Self::cap_sensor_value(x),

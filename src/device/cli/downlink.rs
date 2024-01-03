@@ -42,6 +42,8 @@ where
     pub async fn run(&mut self) -> Result<(), DriverError> {
         loop {
             if let Ok(byte) = nb_async(|| self.rx.read()).await {
+                defmt::trace!("Received byte, processing it now.");
+
                 if byte == b';' {
                     if let Ok(cmd) = Command::try_from(self.buffer_in.as_slice()) {
                         self.command_pipe
@@ -49,9 +51,15 @@ where
                             .await
                             .map_err(|_| DriverError::ReceiverDropped)?;
                     }
+
+                    defmt::info!("End of command detected, clearing the input buffer now.");
                     self.buffer_in.clear();
                 } else {
                     if self.buffer_in.is_full() {
+                        defmt::warn!(
+                            "Input buffer reached total capacity. \
+                            Clearing the input buffer now, please start over again."
+                        );
                         self.buffer_in.clear();
                     }
                     // Safety: we've just made sure the buffer is not full

@@ -40,7 +40,7 @@ where
             State::TileNeeded(game, mut p) => match game.place_tile(p.generate_tile()) {
                 Either::Left(game) => State::TileFloating(game, p),
                 Either::Right(mut game) => {
-                    defmt::info!("restarting game");
+                    defmt::info!("Game over, please try again!");
                     let o = game
                         .clear_observer()
                         .expect("game should have an observer set");
@@ -64,17 +64,17 @@ where
     fn rotate(self) -> Self {
         if let State::TileFloating(mut game, p) = self {
             if game.rotate_tile().is_err() {
-                defmt::trace!("Ignoring invalid rotation");
+                defmt::debug!("Ignoring invalid rotation.");
             }
             State::TileFloating(game, p)
         } else {
-            defmt::trace!("Ignoring rotation due to invalid state");
+            defmt::debug!("Ignoring rotation due to inapplicable state.");
             self
         }
     }
 
     fn move_to(self, column: u8) -> Self {
-        defmt::trace!("column: {}", column);
+        defmt::debug!("column: {}", column);
 
         if let State::TileFloating(mut game, p) = self {
             let difference =
@@ -83,20 +83,20 @@ where
             for _ in 1..=difference.abs() {
                 if difference < 0 {
                     if game.move_tile_left().is_err() {
-                        defmt::trace!("Ignoring invalid move to the left");
+                        defmt::debug!("Ignoring invalid move to the left");
                         break;
                     }
                 } else {
                     #[allow(clippy::collapsible_else_if)] // keeping this for matching source layout
                     if game.move_tile_right().is_err() {
-                        defmt::trace!("Ignoring invalid move to the right");
+                        defmt::debug!("Ignoring invalid move to the right");
                         break;
                     }
                 }
             }
             Self::TileFloating(game, p)
         } else {
-            defmt::trace!("Ignoring horizontal movement due to invalid state");
+            defmt::debug!("Ignoring horizontal movement due to inapplicable state");
             self
         }
     }
@@ -192,13 +192,15 @@ where
     pub async fn run(&mut self) -> Result<(), DriverError> {
         loop {
             let msg = self.mailbox.recv().await.map_err(|e| match e {
-                ReceiveError::Empty => unreachable!(""),
+                ReceiveError::Empty => unreachable!(),
                 ReceiveError::NoSender => DriverError::SenderDropped,
             })?;
-            defmt::debug!(
-                "consuming message, more messages pending: {}",
-                !self.mailbox.is_empty()
-            );
+
+            defmt::trace!("Received message, processing it now.");
+
+            if !self.mailbox.is_empty() {
+                defmt::warn!("Additional messages are pending.");
+            }
 
             match msg {
                 Message::TimerTick => {
