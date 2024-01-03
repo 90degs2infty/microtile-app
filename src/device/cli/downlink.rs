@@ -42,6 +42,8 @@ where
     pub async fn run(&mut self) -> Result<(), DriverError> {
         loop {
             if let Ok(byte) = nb_async(|| self.rx.read()).await {
+                defmt::trace!("Received byte, processing it now.");
+
                 if byte == b';' {
                     if let Ok(cmd) = Command::try_from(self.buffer_in.as_slice()) {
                         self.command_pipe

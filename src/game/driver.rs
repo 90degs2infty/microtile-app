@@ -195,8 +195,11 @@ where
                 ReceiveError::Empty => unreachable!(),
                 ReceiveError::NoSender => DriverError::SenderDropped,
             })?;
+
+            defmt::trace!("Received message, processing it now.");
+
             if !self.mailbox.is_empty() {
-                defmt::warn!("Processing game message, but more messages are pending.");
+                defmt::warn!("Additional messages are pending.");
             }
 
             match msg {

@@ -41,6 +41,9 @@ where
                 .recv()
                 .await
                 .map_err(|_| DriverError::SenderDropped)?;
+
+            defmt::trace!("Received string, processing it now.");
+
             write!(self.tx, "{msg}").map_err(|_| DriverError::FormatError)?;
             nb_async(|| self.tx.flush())
                 .await

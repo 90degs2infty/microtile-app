@@ -212,8 +212,6 @@ impl<'a, 'b, T> HorizontalMovementDriver<'a, 'b, T, Started> {
         CommE: Debug,
         PinE: Debug,
     {
-        defmt::trace!("HorizontalMovementDriver::handle_accel_event()");
-
         // We have to check the channel for having a pending event, because of the way
         // the Gpiote peripheral works: there is a single Gpiote IRQ which gets pended
         // if there is an event _on any_ of the available channels.
