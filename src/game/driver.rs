@@ -40,7 +40,7 @@ where
             State::TileNeeded(game, mut p) => match game.place_tile(p.generate_tile()) {
                 Either::Left(game) => State::TileFloating(game, p),
                 Either::Right(mut game) => {
-                    defmt::debug!("Game has ended, restarting.");
+                    defmt::info!("Game over, please try again!");
                     let o = game
                         .clear_observer()
                         .expect("game should have an observer set");
