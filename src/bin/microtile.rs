@@ -265,7 +265,6 @@ mod app {
 
     #[task(binds = TIMER0, priority = 4, shared = [ display ])]
     fn drive_display_low_level(mut cx: drive_display_low_level::Context) {
-        defmt::trace!("microtile_app::drive_display_low_level()");
         cx.shared.display.lock(|display| {
             display.handle_display_event();
         });
