@@ -125,9 +125,14 @@ mod app {
 
         let board = Board::new(cx.device, cx.core);
 
+        defmt::info!(
+            "Taking care of known third-party errata. \
+            This will take some time, please be patient."
+        );
         let mut delay = Timer::new(board.TIMER2);
         let (twim0, pins) =
             clear_int_i2c_interrupt_line(board.TWIM0, board.i2c_internal, &mut delay);
+        defmt::info!("Done taking care of errata.");
 
         // Setup commandline interface
         let cli_resources = cx.local.cli_resources_mem.write(CliResources::default());
