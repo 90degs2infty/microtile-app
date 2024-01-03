@@ -247,6 +247,7 @@ mod app {
 
     #[task(priority = 1, local = [ next_frame_passive: bool = false ], shared = [ display, passive_frame, merged_frame ])]
     async fn display_toggle_frame(cx: display_toggle_frame::Context) {
+        defmt::trace!("microtile_app::display_toggle_frame()");
         if *cx.local.next_frame_passive {
             (cx.shared.display, cx.shared.passive_frame)
                 .lock(|display, frame| display.show_frame(frame));
@@ -259,6 +260,7 @@ mod app {
 
     #[task(binds = TIMER0, priority = 4, shared = [ display ])]
     fn drive_display_low_level(mut cx: drive_display_low_level::Context) {
+        defmt::trace!("microtile_app::drive_display_low_level()");
         cx.shared.display.lock(|display| {
             display.handle_display_event();
         });
@@ -302,6 +304,7 @@ mod app {
 
     #[task(binds = TIMER2, priority = 4, local = [ timer_handler ])]
     fn tick_game(cx: tick_game::Context) {
+        defmt::trace!("microtile_app::tick_game()");
         match cx.local.timer_handler.handle_timer_event() {
             Ok(()) => {}
             Err(TrySendError::Full(_)) => {
@@ -322,6 +325,8 @@ mod app {
 
     #[task(binds = GPIOTE, priority = 4, local = [ rotation_handler, horizontal_handler ])]
     fn handle_gpio_events(cx: handle_gpio_events::Context) {
+        defmt::trace!("microtile_app::handle_gpio_events()");
+
         // TODO: pull out detection of who is responsible for the event handling?
         match cx.local.rotation_handler.handle_button_event() {
             Ok(()) => {}
@@ -330,6 +335,7 @@ mod app {
             }
             Err(TrySendError::NoReceiver(_)) => unreachable!(),
         };
+
         #[allow(clippy::match_same_arms)]
         match cx.local.horizontal_handler.handle_accel_event() {
             Ok(()) => {}
