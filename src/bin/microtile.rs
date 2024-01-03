@@ -201,6 +201,8 @@ mod app {
         highlevel_display.enable_interrupt();
         highlevel_display.start(HIGH_LEVEL_DISPLAY_CYCLES);
 
+        defmt::info!("Ready, set, go! The game is just about to start!");
+
         unsafe {
             NVIC::unmask(HighLevelDisplayDriver::INTERRUPT);
         }
