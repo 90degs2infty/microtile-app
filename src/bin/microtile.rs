@@ -71,7 +71,7 @@ mod app {
             // because processing the last row triggers a signal and placing a new tile triggers a signal too
             match update_frames::spawn(active, passive) {
                 Ok(()) => {}
-                Err(_) => defmt::debug!("dropping board update to allow for hardware to catch up"),
+                Err(_) => defmt::warn!("Dropping board update to allow for hardware to catch up"),
             }
         }
     }
@@ -117,7 +117,11 @@ mod app {
         command_receiver_mem: MaybeUninit<CommandReceiver> = MaybeUninit::uninit(),
     ])]
     fn init(cx: init::Context) -> (Shared, Local) {
-        defmt::info!("init");
+        defmt::trace!("microtile_app::init()");
+        defmt::info!(
+            "Welcome to microtile, a microscopic Tetris® inspired \
+            application targeting the BBC micro:bit v2."
+        );
 
         let board = Board::new(cx.device, cx.core);
 
@@ -218,7 +222,7 @@ mod app {
     // Optional idle, can be removed if not needed.
     #[idle]
     fn idle(_: idle::Context) -> ! {
-        defmt::info!("idle");
+        defmt::trace!("microtile_app::idle()");
 
         #[allow(clippy::empty_loop)]
         loop {}
@@ -226,15 +230,18 @@ mod app {
 
     #[task(binds = TIMER1, priority = 4, local = [ highlevel_display_driver ])]
     fn drive_display_high_level(cx: drive_display_high_level::Context) {
-        defmt::info!("tick");
+        defmt::trace!("microtile_app::drive_display_high_level()");
         cx.local.highlevel_display_driver.reset_event();
 
         // Error value indicates that the display_toggle_frame task is still running.
         // In this case, we drop the event silently to give the processor opportunity
         // to catch up.
         match display_toggle_frame::spawn() {
-            Ok(_) => {},
-            Err(_) => defmt::debug!("dropping highlevel display driver event because display_toggle_frame is still running")
+            Ok(_) => {}
+            Err(_) => defmt::warn!(
+                "Failed to respawn microtile_app::display_toggle_frame() \
+                because it is still running."
+            ),
         };
     }
 
@@ -259,7 +266,7 @@ mod app {
 
     #[task(priority = 1, local = [ downlink_driver ])]
     async fn drive_cli_downlink(cx: drive_cli_downlink::Context) {
-        defmt::trace!("driving the serial interface's downlink now");
+        defmt::trace!("microtile_app::drive_cli_downlink()");
         cx.local
             .downlink_driver
             .run()
@@ -269,7 +276,7 @@ mod app {
 
     #[task(priority = 1, local = [ uplink_driver ])]
     async fn drive_cli_uplink(cx: drive_cli_uplink::Context) {
-        defmt::trace!("driving the serial interface's uplink now");
+        defmt::trace!("microtile_app::drive_cli_uplink()");
         cx.local
             .uplink_driver
             .run()
@@ -279,7 +286,7 @@ mod app {
 
     #[task(priority = 1, local = [ command_driver ])]
     async fn drive_command_processing(cx: drive_command_processing::Context) {
-        defmt::trace!("processing cli commands now");
+        defmt::trace!("microtile_app::drive_command_processing()");
         cx.local
             .command_driver
             .run()
@@ -289,7 +296,7 @@ mod app {
 
     #[task(priority = 1, local = [ game_driver ])]
     async fn drive_game(cx: drive_game::Context) {
-        defmt::trace!("driving the game now");
+        defmt::trace!("microtile_app::drive_game()");
         let _ = cx.local.game_driver.run().await;
     }
 
@@ -298,7 +305,7 @@ mod app {
         match cx.local.timer_handler.handle_timer_event() {
             Ok(()) => {}
             Err(TrySendError::Full(_)) => {
-                defmt::debug!("dropping game tick to allow the engine to catch up");
+                defmt::warn!("Dropping a game tick to allow the engine to catch up.");
             }
             Err(TrySendError::NoReceiver(_)) => unreachable!(),
         };
@@ -306,12 +313,11 @@ mod app {
 
     #[task(priority = 1, shared = [ merged_frame, passive_frame ])]
     async fn update_frames(cx: update_frames::Context, active: Grid, passive: Grid) {
-        defmt::trace!("entering frame update");
+        defmt::trace!("microtile_app::update_frames()");
         (cx.shared.merged_frame, cx.shared.passive_frame).lock(|merged_frame, passive_frame| {
             passive_frame.set(&GridRenderer::new(&passive));
             merged_frame.set(&GridRenderer::new(&active.union(&passive)));
         });
-        defmt::trace!("leaving frame update");
     }
 
     #[task(binds = GPIOTE, priority = 4, local = [ rotation_handler, horizontal_handler ])]
@@ -320,7 +326,7 @@ mod app {
         match cx.local.rotation_handler.handle_button_event() {
             Ok(()) => {}
             Err(TrySendError::Full(_)) => {
-                defmt::debug!("dropping tile rotation to allow the engine to catch up");
+                defmt::warn!("Dropping a tile rotation to allow the engine to catch up.");
             }
             Err(TrySendError::NoReceiver(_)) => unreachable!(),
         };
@@ -328,11 +334,15 @@ mod app {
         match cx.local.horizontal_handler.handle_accel_event() {
             Ok(()) => {}
             Err(AccelError::ConsumerError(TrySendError::Full(_))) => {
-                defmt::debug!("dropping horizontal tile movement to allow the engine to catch up");
+                defmt::warn!(
+                    "Dropping a horizontal tile movement to allow the engine to catch up."
+                );
             }
             Err(AccelError::ConsumerError(TrySendError::NoReceiver(_))) => unreachable!(),
             Err(AccelError::ProducerError(_)) => {
-                defmt::debug!("failed handling accelerometer event due to lsm303agr error");
+                defmt::error!(
+                    "Failed to handle accelerometer event due to LSM303AGR internal error."
+                );
             }
         }
     }
