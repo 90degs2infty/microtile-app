@@ -57,6 +57,9 @@ jobs:
             target_dir: debug
           - profile: release
             target_dir: release
+    env:
+      DEFMT_LOG: info
+      RUST_LOG: info
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@v1
