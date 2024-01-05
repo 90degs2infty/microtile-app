@@ -1,83 +1,39 @@
-# `micro:bit` template
+# `microtile-app`
 
-A basic RTIC template targeting the `micro:bit v2` for usage throughout further assignments in this course.
+A microscopic Tetris® inspired application, targeting the [BBC micro:bit v2](https://microbit.org/).
+For the underlying engine, see [`microtile-engine`](https://github.com/90degs2infty/microtile-engine).
 
-Based on https://github.com/rtic-rs/defmt-app-template which is in turn based on https://github.com/knurling-rs/app-template
-
-## Dependencies
-
-#### 1. `flip-link`:
-
-```console
-$ cargo install flip-link
-```
-
-#### 2. `probe-run`:
-
-``` console
-$ # make sure to install v0.2.0 or later
-$ cargo install probe-rs --features cli
-```
-
-## Setup
-
-#### 1. Clone the project template
-
-``` console
-$ cargo generate -g https://github.com/90degs2infty/making-embedded-systems.git microbit-template
-```
-
-#### 2. Run!
-
-You are now all set to `cargo-run` your first `defmt`-powered application!
-There are some examples in the `src/bin` directory.
-
-Start by `cargo run`-ning `my-app/src/bin/minimal.rs`:
-
-``` console
-$ # `rb` is an alias for `run --bin`
-$ DEFMT_LOG=trace cargo rb minimal
-    Finished dev [optimized + debuginfo] target(s) in 0.03s
-flashing program ..
-DONE
-resetting device
-0.000000 INFO Hello, world!
-(..)
-
-$ echo $?
-0
-```
-
-[RA docs]: https://rust-analyzer.github.io/manual.html#configuration
-[rust-analyzer]: https://rust-analyzer.github.io/
+I'm enrolled in the 2023 edition of the [Making Embedded Systems course by Elecia White](https://classpert.com/classpertx/courses/making-embedded-systems/cohort).
+This repository is part of my final project submission.
 
 ## License
 
 Licensed under either of
 
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or
-  http://www.apache.org/licenses/LICENSE-2.0)
-
-- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+- Apache License, Version 2.0 ([LICENSE-APACHE](./LICENSE-APACHE) or [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0))
+- MIT license ([LICENSE-MIT](./LICENSE-MIT) or [http://opensource.org/licenses/MIT](http://opensource.org/licenses/MIT))
 
 at your option.
 
+## Contribution
+
+Since the aforementioned course is still running and this repository is part of the final project, I currently do not take any outside contributions.
+This will change, once the course is over.
+
+Nevertheless, please feel free to point out suggestions, improvements and alike anyway!
+Thank you! :blush:
+
 ## Credits
 
-### Support
+### Tetris®
 
-`app-template` is part of the [Knurling] project, [Ferrous Systems]' effort at
-improving tooling used to develop for embedded systems.
+Tetris® is a registered trademark of Tetris Holding, LLC and The Tetris Company, Inc. is its exclusive licensee.
+This repository is in no way affiliated with or sponsored by neither Tetris Holding, LLC nor The Tetris Company, Inc. nor is it part of their Tetris® line of products.
+For the latest information about the Tetris® brand and Tetris® products, please visit [www.tetris.com](https://tetris.com).
 
-If you think that our work is useful, consider sponsoring it via [GitHub
-Sponsors].
+### Knurling and RTIC
 
-### Contribution
+This application is based on a template maintained by the [Knurling project](https://github.com/knurling-rs/app-template) adapted by the [RTIC project](https://github.com/rtic-rs/defmt-app-template).
+The template is licensed under MIT or Apache-2.0 license, please find details on the respective licenses [here](https://github.com/knurling-rs/app-template#license) and [here](https://github.com/rtic-rs/defmt-app-template#license).
 
-Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
-licensed as above, without any additional terms or conditions.
-
-[Knurling]: https://knurling.ferrous-systems.com
-[Ferrous Systems]: https://ferrous-systems.com/
-[GitHub Sponsors]: https://github.com/sponsors/knurling-rs
+If you think that their work is useful, consider sponsoring them!

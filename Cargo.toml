@@ -2,7 +2,12 @@
 authors = ["90degs2infty <90degs2infty@posteo.org>"]
 name = "microtile-app"
 edition = "2021"
-version = "0.1.0"
+version = "0.2.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/90degs2infty/microtile-app"
+categories = [ "embedded", "games", "no-std" ]
+keywords = [ "microbit", "rtic" ]
+description = "A microscopic Tetris® inspired application, targeting the BBC micro:bit v2."
 
 [dependencies]
 cortex-m = { version = "0.7", features = ["critical-section-single-core"] }
@@ -13,6 +18,15 @@ rtic = { version = "2.0.1", features = [ "thumbv7-backend" ] }
 microbit-v2 = "0.13"
 # TODO add a monotonic if you use scheduling
 # rtic-monotonics = { version = "1.0.0", features = [ "cortex-m-systick" ]}
+microtile-engine = { git = "https://github.com/90degs2infty/microtile-engine.git", branch = "main", version = "0.2.0" }
+tiny-led-matrix = "1.0.2"
+rtic-sync = "1.0.2"
+either = { version = "1.9.0", default_features = false }
+lsm303agr = "0.3.0"
+micromath = "2.1.0"
+heapless = "0.8.0"
+futures = { version = "0.3.29", default_features = false }
+nb = "1.1.0"
 
 # cargo build/run
 [profile.dev]
@@ -52,5 +66,30 @@ lto = 'fat'
 opt-level = "s" # <-
 overflow-checks = false # <-
 
+[lints.rust]
+missing_docs = { level = "warn", priority = 0 }
+
+[lints.rustdoc]
+missing_crate_level_docs = { level = "warn", priority = 1 }
+unescaped_backticks = { level = "warn", priority = 1 }
+
+[lints.clippy]
+cargo = { level = "warn", priority = 2 }
+all = { level = "warn", priority = 3 }
+pedantic = { level = "warn", priority = 4 }
+absolute_paths = { level = "warn", priority = 2 }
+# The following lints are allowed because
+# - clippy::module_name_repetitions - I struggle to come up with non-repetitive, meaningful names
+# - clippy::ignored_unit_patterns - to keep the `defmt` macros from triggering lints in my own code
+module_name_repetitions = { level = "allow", priority = 5 }
+ignored_unit_patterns = { level = "allow", priority = 5 }
+
 [patch.crates-io]
 microbit-v2 = { git = "https://github.com/90degs2infty/microbit.git", branch = "feature_update-hal" }
+
+[[bin]]
+name = "microtile"
+path = "src/bin/microtile.rs"
+
+[build-dependencies]
+vergen = { version = "8.2.6", features = ["git", "gitcl"] }
