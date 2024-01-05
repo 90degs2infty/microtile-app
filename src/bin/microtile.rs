@@ -58,7 +58,7 @@ mod app {
     use microtile_engine::{gameplay::game::Observer, geometry::grid::Grid};
     use rtic_sync::channel::{Channel, TrySendError};
 
-    const HIGH_LEVEL_DISPLAY_FREQ: u32 = 5;
+    const HIGH_LEVEL_DISPLAY_FREQ: u32 = 6;
     const HIGH_LEVEL_DISPLAY_CYCLES: u32 =
         Timer::<HighLevelDisplayDriver, Periodic>::TICKS_PER_SECOND / HIGH_LEVEL_DISPLAY_FREQ;
 
