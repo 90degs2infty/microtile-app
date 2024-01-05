@@ -48,7 +48,7 @@ where
                     game.set_observer(o)
                         .expect("newly initialized game should not have observer set");
                     let game = game
-                        .place_tile(BasicTile::Diagonal)
+                        .place_tile(p.generate_tile())
                         .expect_left("first tile should not end game");
                     State::TileFloating(game, p)
                 }
@@ -133,22 +133,6 @@ where
     const COLUMN_2_THRESHOLD: f32 = Self::COLUMN_2_THRESHOLD_UNCOMP - FRAC_PI_2;
     const COLUMN_3_THRESHOLD: f32 = Self::COLUMN_3_THRESHOLD_UNCOMP - FRAC_PI_2;
 
-    /// Note: the contained peripherals start generating events right away, so be sure to
-    /// set up the event handling as fast as possible
-    pub fn new(mailbox: Receiver<'a, Message, MAILBOX_CAPACITY>, o: O, producer: P) -> Self {
-        // initialize the game
-        let mut game = Game::default()
-            .place_tile(BasicTile::Diagonal)
-            .expect_left("the first tile should not end the game");
-        game.set_observer(o)
-            .expect("newly initialized game should not have observer set");
-
-        Self {
-            s: Some(State::TileFloating(game, producer)),
-            mailbox,
-        }
-    }
-
     fn convert_accel_to_column(x: i16, z: i16) -> u8 {
         let x: f32 = x.into();
         let z: f32 = z.into();
@@ -189,6 +173,22 @@ where
     O: Observer + Debug,
     P: TileProducer,
 {
+    /// Note: the contained peripherals start generating events right away, so be sure to
+    /// set up the event handling as fast as possible
+    pub fn new(mailbox: Receiver<'a, Message, MAILBOX_CAPACITY>, o: O, mut producer: P) -> Self {
+        // initialize the game
+        let mut game = Game::default()
+            .place_tile(producer.generate_tile())
+            .expect_left("the first tile should not end the game");
+        game.set_observer(o)
+            .expect("newly initialized game should not have observer set");
+
+        Self {
+            s: Some(State::TileFloating(game, producer)),
+            mailbox,
+        }
+    }
+
     pub async fn run(&mut self) -> Result<(), DriverError> {
         loop {
             let msg = self.mailbox.recv().await.map_err(|e| match e {
