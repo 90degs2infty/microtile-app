@@ -15,7 +15,7 @@ use microtile_app as _; // global logger + panicking-behavior + memory layout
 
 #[rtic::app(
     device = microbit_pac,
-    dispatchers = [SWI0_EGU0]
+    dispatchers = [SWI0_EGU0, SWI1_EGU1]
 )]
 mod app {
     use core::mem::MaybeUninit;
@@ -320,7 +320,7 @@ mod app {
         };
     }
 
-    #[task(priority = 1, shared = [ merged_frame, passive_frame ])]
+    #[task(priority = 2, shared = [ merged_frame, passive_frame ])]
     async fn update_frames(cx: update_frames::Context, active: Grid, passive: Grid) {
         defmt::trace!("microtile_app::update_frames()");
         (cx.shared.merged_frame, cx.shared.passive_frame).lock(|merged_frame, passive_frame| {
