@@ -1,0 +1,27 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cargo",
+			"command": "build",
+			"args": [
+				"--profile",
+				"dev",
+				"--bin",
+				"microtile"
+			],
+			"env": {
+				"DEFMT_LOG": "info",
+				"RUST_LOG": "info"
+			},
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"label": "rust: cargo build"
+		}
+	]
+}
