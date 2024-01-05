@@ -15,7 +15,7 @@ use microtile_app as _; // global logger + panicking-behavior + memory layout
 
 #[rtic::app(
     device = microbit_pac,
-    dispatchers = [SWI0_EGU0]
+    dispatchers = [SWI0_EGU0, SWI1_EGU1]
 )]
 mod app {
     use core::mem::MaybeUninit;
@@ -58,7 +58,7 @@ mod app {
     use microtile_engine::{gameplay::game::Observer, geometry::grid::Grid};
     use rtic_sync::channel::{Channel, TrySendError};
 
-    const HIGH_LEVEL_DISPLAY_FREQ: u32 = 5;
+    const HIGH_LEVEL_DISPLAY_FREQ: u32 = 6;
     const HIGH_LEVEL_DISPLAY_CYCLES: u32 =
         Timer::<HighLevelDisplayDriver, Periodic>::TICKS_PER_SECOND / HIGH_LEVEL_DISPLAY_FREQ;
 
@@ -320,7 +320,7 @@ mod app {
         };
     }
 
-    #[task(priority = 1, shared = [ merged_frame, passive_frame ])]
+    #[task(priority = 2, shared = [ merged_frame, passive_frame ])]
     async fn update_frames(cx: update_frames::Context, active: Grid, passive: Grid) {
         defmt::trace!("microtile_app::update_frames()");
         (cx.shared.merged_frame, cx.shared.passive_frame).lock(|merged_frame, passive_frame| {

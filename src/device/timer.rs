@@ -1,5 +1,5 @@
 use crate::game::{driver::MAILBOX_CAPACITY, message::Message};
-use core::{marker::PhantomData, ops::Not};
+use core::marker::PhantomData;
 use cortex_m::prelude::_embedded_hal_timer_CountDown;
 use microbit::{
     gpio::BTN_A,
@@ -19,15 +19,19 @@ pub struct GameTickDriver<'a, T, S> {
     button: BTN_A,
     timer: Timer<T, Periodic>,
     // flag indicating whether the next timer event triggers a tick no matter what state button is in
-    force_tick: bool,
+    force_tick: u8,
     s: PhantomData<S>,
+}
+
+impl<'a, T, S> GameTickDriver<'a, T, S> {
+    const GAME_FORCE_TICK_COUNTER: u8 = 3;
+    const GAME_TICK_FREQ: u32 = 3;
 }
 
 impl<'a, T, S> GameTickDriver<'a, T, S>
 where
     T: Instance,
 {
-    const GAME_TICK_FREQ: u32 = 2;
     const GAME_TICK_CYCLES: u32 = Timer::<T, Periodic>::TICKS_PER_SECOND / Self::GAME_TICK_FREQ;
 }
 
@@ -44,7 +48,7 @@ where
             command_pipe: mailbox,
             button,
             timer,
-            force_tick: false,
+            force_tick: 1,
             s: PhantomData,
         }
     }
@@ -58,7 +62,7 @@ where
             command_pipe: self.command_pipe,
             button: self.button,
             timer: self.timer,
-            force_tick: false,
+            force_tick: 1,
             s: PhantomData,
         }
     }
@@ -75,17 +79,17 @@ where
     pub fn handle_timer_event(&mut self) -> Result<(), TrySendError<Message>> {
         self.timer.reset_event();
 
-        self.force_tick = self.force_tick.not();
-
         // button is active low
-        if self.force_tick
+        if self.force_tick == Self::GAME_FORCE_TICK_COUNTER
             || self
                 .button
                 .is_low()
                 .expect("getting input pin state should always be valid")
         {
+            self.force_tick = 0;
             self.command_pipe.try_send(Message::TimerTick)
         } else {
+            self.force_tick += 1;
             Ok(())
         }
     }
@@ -98,7 +102,7 @@ where
             command_pipe: self.command_pipe,
             button: self.button,
             timer: self.timer,
-            force_tick: false,
+            force_tick: 1,
             s: PhantomData,
         }
     }
