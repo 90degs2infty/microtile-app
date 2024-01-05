@@ -6,10 +6,7 @@ use core::{
 };
 use either::Either;
 use micromath::F32Ext;
-use microtile_engine::{
-    gameplay::game::{Game, Observer, ProcessRows, TileFloating, TileNeeded},
-    geometry::tile::BasicTile,
-};
+use microtile_engine::gameplay::game::{Game, Observer, ProcessRows, TileFloating, TileNeeded};
 use rtic_sync::channel::{ReceiveError, Receiver};
 
 pub enum DriverError {
