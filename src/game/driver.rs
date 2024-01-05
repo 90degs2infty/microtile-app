@@ -199,7 +199,7 @@ where
             defmt::trace!("Received message, processing it now.");
 
             if !self.mailbox.is_empty() {
-                defmt::warn!("Additional messages are pending.");
+                defmt::debug!("Additional messages are pending.");
             }
 
             match msg {
