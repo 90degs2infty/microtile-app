@@ -67,7 +67,7 @@ jobs:
       - name: Install `flip-link`
         run: cargo install flip-link
       - name: Build application in ${{ matrix.profile }} profile
-        run: cargo build --profile ${{ matrix.profile }}
+        run: cargo build --profile ${{ matrix.profile }} --locked
       - name: Upload binary in ${{ matrix.profile }} profile
         uses: actions/upload-artifact@v3
         with:
